@@ -6,13 +6,32 @@ module Ai
   class VisualSearchAdapter
     API_URL = "https://vision.googleapis.com/v1/images:annotate"
 
-    # Perform visual search using Google Vision Web Detection
+    # Perform visual search using Google Vision Web Detection (base64 image)
     # This is similar to Google Lens functionality
     def self.search(image_data:, bounding_box: nil, options: {})
       api_key = ENV['GOOGLE_CLOUD_API_KEY']
       raise "Google Cloud API Key not set" unless api_key
 
-      payload = build_payload(image_data, bounding_box, options)
+      image_source = build_base64_image_source(image_data)
+      payload = build_payload(image_source, bounding_box, options)
+      
+      execute_search(api_key, payload)
+    end
+
+    # Perform visual search using an image URL
+    def self.search_from_url(image_url:, bounding_box: nil, options: {})
+      api_key = ENV['GOOGLE_CLOUD_API_KEY']
+      raise "Google Cloud API Key not set" unless api_key
+
+      image_source = { source: { imageUri: image_url } }
+      payload = build_payload(image_source, bounding_box, options)
+      
+      execute_search(api_key, payload)
+    end
+
+    private
+
+    def self.execute_search(api_key, payload)
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
       response = Faraday.post("#{API_URL}?key=#{api_key}") do |req|
@@ -26,16 +45,17 @@ module Ai
       handle_response(response, processing_time_ms)
     end
 
-    private
-
-    def self.build_payload(image_data, bounding_box, options)
+    def self.build_base64_image_source(image_data)
       # Handle base64 with or without data URI prefix
       base64_content = if image_data.include?(',')
                          image_data.split(',').last
                        else
                          image_data
                        end
+      { content: base64_content }
+    end
 
+    def self.build_payload(image_source, bounding_box, options)
       image_context = {}
       
       # If bounding box provided, crop to that region
@@ -50,7 +70,7 @@ module Ai
       {
         requests: [
           {
-            image: { content: base64_content },
+            image: image_source,
             features: [
               { type: "WEB_DETECTION", maxResults: options[:max_results] || 20 },
               { type: "PRODUCT_SEARCH", maxResults: 10 },

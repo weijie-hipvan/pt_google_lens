@@ -12,6 +12,10 @@ module Ai
       raise NotImplementedError, "#{self.class} must implement #detect"
     end
 
+    def detect_from_url(image_url, options = {})
+      raise NotImplementedError, "#{self.class} must implement #detect_from_url"
+    end
+
     protected
 
     def generate_request_id
