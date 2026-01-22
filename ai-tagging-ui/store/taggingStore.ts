@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DetectedObject, ImageDimensions } from '@/types/ai';
+import { DetectedObject, ImageDimensions, RelatedProduct } from '@/types/ai';
 
 /**
  * Tagging application state
@@ -32,6 +32,7 @@ interface TaggingState {
   setError: (error: string | null) => void;
   getAcceptedObjects: () => DetectedObject[];
   getPendingObjects: () => DetectedObject[];
+  setObjectRelatedProducts: (objectId: string, products: RelatedProduct[]) => void;
 }
 
 /**
@@ -131,4 +132,12 @@ export const useTaggingStore = create<TaggingState>((set, get) => ({
   // Get only pending objects
   getPendingObjects: () =>
     get().objects.filter((obj) => obj.status === 'pending'),
+
+  // Set related products for an object
+  setObjectRelatedProducts: (objectId, products) =>
+    set((state) => ({
+      objects: state.objects.map((obj) =>
+        obj.id === objectId ? { ...obj, related_products: products } : obj
+      ),
+    })),
 }));

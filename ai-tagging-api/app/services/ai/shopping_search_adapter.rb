@@ -13,7 +13,19 @@ module Ai
     # Requires SERPAPI_KEY environment variable
     def self.search_serpapi(query:, options: {})
       api_key = ENV['SERPAPI_KEY']
-      return fallback_search(query: query, options: options) unless api_key
+      
+      # Debug logging using puts for immediate output
+      puts "=" * 60
+      puts "[SerpApi] Starting shopping search"
+      puts "[SerpApi] Query: #{query}"
+      puts "[SerpApi] SERPAPI_KEY present: #{api_key.present?}"
+      puts "[SerpApi] SERPAPI_KEY length: #{api_key&.length || 0}"
+      puts "[SerpApi] SERPAPI_KEY first 8 chars: #{api_key&.first(8)}..." if api_key.present?
+      
+      unless api_key
+        puts "[SerpApi] No SERPAPI_KEY found! Falling back to links."
+        return fallback_search(query: query, options: options)
+      end
 
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
@@ -26,13 +38,24 @@ module Ai
         num: options[:max_results] || 10
       }
 
+      puts "[SerpApi] Request URL: #{SERPAPI_URL}"
+      puts "[SerpApi] Request params (excluding key): #{params.except(:api_key)}"
+
       response = Faraday.get(SERPAPI_URL, params)
       end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       processing_time_ms = ((end_time - start_time) * 1000).round
 
+      puts "[SerpApi] Response status: #{response.status}"
+      puts "[SerpApi] Response time: #{processing_time_ms}ms"
+      puts "[SerpApi] Response body preview: #{response.body&.first(500)}..."
+      puts "=" * 60
+
       handle_serpapi_response(response, processing_time_ms, query)
     rescue StandardError => e
-      Rails.logger.error "SerpApi Shopping Search Error: #{e.message}"
+      puts "=" * 60
+      puts "[SerpApi] ERROR: #{e.class} - #{e.message}"
+      puts "[SerpApi] Backtrace: #{e.backtrace&.first(5)&.join("\n")}"
+      puts "=" * 60
       fallback_search(query: query, options: options)
     end
 
@@ -74,13 +97,26 @@ module Ai
 
     # Main search method - tries SerpApi first, then fallback
     def self.search(query:, options: {})
+      puts "=" * 60
+      puts "[ShoppingSearch] search() called with query: #{query}"
+      puts "[ShoppingSearch] ENV['SERPAPI_KEY'] present?: #{ENV['SERPAPI_KEY'].present?}"
+      puts "[ShoppingSearch] ENV['SERPAPI_KEY'] value: #{ENV['SERPAPI_KEY']&.first(10)}..." if ENV['SERPAPI_KEY'].present?
+      puts "[ShoppingSearch] All SERP* env vars: #{ENV.keys.select { |k| k.include?('SERP') }}"
+      puts "=" * 60
+      
       # Try SerpApi first (best results)
       if ENV['SERPAPI_KEY'].present?
+        puts "[ShoppingSearch] -> Calling search_serpapi..."
         result = search_serpapi(query: query, options: options)
+        puts "[ShoppingSearch] -> search_serpapi returned: success=#{result[:success]}, source=#{result[:source]}"
         return result if result[:success]
+        puts "[ShoppingSearch] -> search_serpapi failed, falling back..."
+      else
+        puts "[ShoppingSearch] -> SERPAPI_KEY NOT FOUND! Using fallback."
       end
 
       # Fallback to simulated results based on web detection
+      puts "[ShoppingSearch] -> Using fallback_search"
       fallback_search(query: query, options: options)
     end
 

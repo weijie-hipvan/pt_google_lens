@@ -30,6 +30,7 @@ module Api
       def create
         image = detection_params[:image]
         options = detection_params[:options] || {}
+        image_dimensions = detection_params[:image_dimensions]
 
         # Validate required parameters
         if image.blank?
@@ -44,7 +45,19 @@ module Api
         service = Ai::DetectionService.new(provider: options[:provider] || 'google')
         result = service.detect(image, options.to_h.symbolize_keys)
 
-        if result[:success]
+        if result[:success] && result[:objects].present?
+          # Generate thumbnails for detected objects if image dimensions provided
+          if image_dimensions.present?
+            thumbnail_service = ThumbnailService.new(base_url: request.base_url)
+            result[:objects] = thumbnail_service.generate_thumbnails(
+              image_data: image,
+              objects: result[:objects],
+              image_dimensions: image_dimensions.to_h.symbolize_keys
+            )
+          end
+
+          render json: result, status: :ok
+        elsif result[:success]
           render json: result, status: :ok
         else
           render json: result, status: :unprocessable_entity
@@ -64,7 +77,8 @@ module Api
       def detection_params
         params.permit(
           :image,
-          options: [:max_objects, :confidence_threshold, :provider]
+          options: [:max_objects, :confidence_threshold, :provider],
+          image_dimensions: [:width, :height]
         )
       end
     end

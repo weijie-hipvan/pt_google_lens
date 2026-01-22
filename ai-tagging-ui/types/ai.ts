@@ -17,6 +17,21 @@ export interface AttributeValue {
 }
 
 /**
+ * Related product found via shopping search
+ */
+export interface RelatedProduct {
+  title: string;
+  url: string;
+  price?: string;
+  extracted_price?: number;
+  image_url?: string;
+  merchant?: string;
+  rating?: number;
+  reviews_count?: number;
+  shipping?: string;
+}
+
+/**
  * Detected object from AI vision API
  */
 export interface DetectedObject {
@@ -26,6 +41,8 @@ export interface DetectedObject {
   bounding_box: BoundingBox;
   attributes?: Record<string, AttributeValue>;
   status: 'pending' | 'accepted' | 'rejected';
+  thumbnail_url?: string; // Cropped thumbnail of the object
+  related_products?: RelatedProduct[]; // Products found via shopping search
 }
 
 /**
@@ -37,6 +54,10 @@ export interface DetectInput {
     max_objects?: number;
     confidence_threshold?: number;
     provider?: 'google' | 'openai' | 'auto';
+  };
+  image_dimensions?: {
+    width: number;
+    height: number;
   };
 }
 
@@ -80,7 +101,15 @@ export interface ExportData {
     label: string;
     confidence: number;
     bounding_box: BoundingBox;
+    bounding_box_pixels?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
     attributes?: Record<string, AttributeValue>;
+    thumbnail_url?: string;
+    related_products?: RelatedProduct[]; // Products found via shopping search
   }>;
 }
 

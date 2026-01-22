@@ -127,17 +127,71 @@ module Ai
         img['url']
       end.compact
 
-      # Build product matches from pages (inferring product info from page URLs/titles)
-      product_matches = pages_with_matching.map do |page|
-        {
+      # Build product matches from multiple sources
+      product_matches = []
+
+      # 1. First try to get from pages with matching images (most relevant)
+      pages_with_matching.each do |page|
+        next if page[:url].nil?
+        product_matches << {
           title: page[:title],
           url: page[:url],
           score: calculate_page_relevance_score(page, web_entities),
           image_url: page[:thumbnail_url],
           merchant: extract_merchant(page[:url]),
-          price: nil # Would need additional scraping to get price
+          price: nil
         }
-      end.sort_by { |p| -p[:score] }.first(10)
+      end
+
+      # 2. If not enough products, add from visually similar images (filter shopping sites)
+      if product_matches.length < 10
+        similar_images.each do |img_url|
+          next if img_url.nil?
+          merchant = extract_merchant(img_url)
+          # Prioritize e-commerce sites
+          is_shopping = %w[amazon ebay etsy wayfair ikea target walmart shopee lazada alibaba hipvan pinterest houzz].any? { |d| img_url.downcase.include?(d) }
+          
+          next unless is_shopping || product_matches.length < 5
+          
+          product_matches << {
+            title: "#{merchant} - Similar Product",
+            url: img_url,
+            score: is_shopping ? 0.7 : 0.4,
+            image_url: img_url,
+            merchant: merchant,
+            price: nil
+          }
+        end
+      end
+
+      # 3. Also try full matches
+      full_matches.each do |img_url|
+        next if img_url.nil? || product_matches.any? { |p| p[:url] == img_url }
+        merchant = extract_merchant(img_url)
+        product_matches << {
+          title: "#{merchant} - Exact Match",
+          url: img_url,
+          score: 0.9,
+          image_url: img_url,
+          merchant: merchant,
+          price: nil
+        }
+      end
+
+      # Get best guess for better titles
+      best_guess = web_detection['bestGuessLabels']&.first&.dig('label') || web_entities.first&.dig(:description)
+
+      # Improve titles using best guess if available
+      if best_guess && product_matches.any?
+        product_matches.each do |p|
+          if p[:title]&.include?('Similar Product') || p[:title]&.include?('Exact Match')
+            p[:title] = "#{best_guess} - #{p[:merchant]}"
+          end
+        end
+      end
+
+      # Remove duplicates and sort by score
+      product_matches = product_matches.uniq { |p| p[:url] }.sort_by { |p| -p[:score] }.first(10)
 
       # Add labels if available
       labels = (response_data['labelAnnotations'] || []).map do |label|
