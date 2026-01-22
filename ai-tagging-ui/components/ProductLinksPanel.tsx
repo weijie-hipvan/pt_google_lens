@@ -121,10 +121,10 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
   };
 
   const tabs = [
-    { id: 'products', label: 'Products', count: searchResult?.product_matches.length || 0, icon: '🛒' },
+    { id: 'products', label: 'Products', count: searchResult?.product_matches?.length || 0, icon: '🛒' },
     { id: 'shop', label: 'Shop', count: shoppingResult?.shopping_links?.length || 0, icon: '💰', loading: isLoadingShopping },
-    { id: 'similar', label: 'Similar', count: searchResult?.visually_similar_images.length || 0, icon: '🖼️' },
-    { id: 'tags', label: 'Tags', count: searchResult?.web_entities.length || 0, icon: '🏷️' },
+    { id: 'similar', label: 'Similar', count: searchResult?.visually_similar_images?.length || 0, icon: '🖼️' },
+    { id: 'tags', label: 'Tags', count: searchResult?.web_entities?.length || 0, icon: '🏷️' },
   ];
 
   return (
@@ -216,7 +216,7 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             {/* Products Tab */}
             {activeTab === 'products' && (
               <div className="space-y-2">
-                {searchResult.product_matches.length > 0 ? (
+                {searchResult?.product_matches && searchResult.product_matches.length > 0 ? (
                   searchResult.product_matches.map((product, idx) => (
                     <ProductCard key={idx} product={product} />
                   ))
@@ -284,8 +284,8 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             {/* Similar Images Tab */}
             {activeTab === 'similar' && (
               <div className="space-y-3">
-                <SimilarImageGrid images={searchResult.visually_similar_images} />
-                {searchResult.pages_with_matching_images.length > 0 && (
+                <SimilarImageGrid images={searchResult?.visually_similar_images || []} />
+                {searchResult?.pages_with_matching_images && searchResult.pages_with_matching_images.length > 0 && (
                   <div className="mt-3">
                     <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Found On</h4>
                     <div className="space-y-1">
@@ -303,13 +303,17 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             )}
 
             {/* Tags Tab */}
-            {activeTab === 'tags' && (
+            {activeTab === 'tags' && (() => {
+              const bestGuessLabels = (searchResult as unknown as { best_guess_labels?: string[] } | null)?.best_guess_labels || [];
+              const labelScores = (searchResult as unknown as { labels?: Array<{ description: string; score: number }> } | null)?.labels || [];
+              
+              return (
               <div className="space-y-3">
-                {(searchResult as unknown as { best_guess_labels?: string[] }).best_guess_labels?.length > 0 && (
+                {bestGuessLabels.length > 0 && (
                   <div>
                     <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">🎯 Best Guess</h4>
                     <div className="flex flex-wrap gap-1.5">
-                      {(searchResult as unknown as { best_guess_labels: string[] }).best_guess_labels.map((label, idx) => (
+                      {bestGuessLabels.map((label, idx) => (
                         <span key={idx} className="px-2.5 py-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 rounded-full text-xs font-medium">
                           {label}
                         </span>
@@ -320,16 +324,16 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                 <div>
                   <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">🏷️ Detected</h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {searchResult.web_entities.map((entity, idx) => (
+                    {searchResult?.web_entities?.map((entity, idx) => (
                       <WebEntityTag key={idx} entity={entity} />
-                    ))}
+                    )) || <p className="text-xs text-gray-500">No tags found</p>}
                   </div>
                 </div>
-                {(searchResult as unknown as { labels?: Array<{ description: string; score: number }> }).labels?.length > 0 && (
+                {labelScores.length > 0 && (
                   <div>
                     <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">📋 Labels</h4>
                     <div className="space-y-1">
-                      {(searchResult as unknown as { labels: Array<{ description: string; score: number }> }).labels.slice(0, 8).map((label, idx) => (
+                      {labelScores.slice(0, 8).map((label, idx) => (
                         <div key={idx} className="flex items-center justify-between text-xs">
                           <span className="text-gray-300">{label.description}</span>
                           <span className="text-gray-500">{(label.score * 100).toFixed(0)}%</span>
@@ -339,7 +343,8 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
         </>
       )}

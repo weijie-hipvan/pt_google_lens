@@ -31,7 +31,16 @@ export default function ExportModal({
       label: obj.label,
       confidence: obj.confidence,
       bounding_box: obj.bounding_box,
+      bounding_box_pixels: imageDimensions
+        ? {
+            x: Math.round(obj.bounding_box.x * imageDimensions.naturalWidth),
+            y: Math.round(obj.bounding_box.y * imageDimensions.naturalHeight),
+            width: Math.round(obj.bounding_box.width * imageDimensions.naturalWidth),
+            height: Math.round(obj.bounding_box.height * imageDimensions.naturalHeight),
+          }
+        : undefined,
       attributes: obj.attributes,
+      thumbnail_url: obj.thumbnail_url,
     })),
   };
 

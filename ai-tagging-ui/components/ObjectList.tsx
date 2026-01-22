@@ -49,10 +49,26 @@ function ObjectCard({
     >
       {/* Header */}
       <div className="p-2.5">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
+          {/* Thumbnail */}
+          {obj.thumbnail_url ? (
+            <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-gray-700">
+              <img 
+                src={obj.thumbnail_url} 
+                alt={obj.label}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          ) : (
+            <div className="w-12 h-12 rounded-md flex-shrink-0 bg-gray-700/50 flex items-center justify-center">
+              <span className="text-lg">{config.icon}</span>
+            </div>
+          )}
+          
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{config.icon}</span>
+            <div className="flex items-center gap-1.5">
+              {!obj.thumbnail_url && <span className="text-sm">{config.icon}</span>}
               <h4 className={`font-medium text-sm truncate ${obj.status === 'rejected' ? 'line-through text-gray-500' : 'text-gray-100'}`}>
                 {obj.label}
               </h4>
@@ -64,7 +80,7 @@ function ObjectCard({
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-            className="p-1 hover:bg-gray-600 rounded transition-colors"
+            className="p-1 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
           >
             <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">

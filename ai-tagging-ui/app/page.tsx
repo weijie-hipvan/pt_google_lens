@@ -25,7 +25,6 @@ export default function Home() {
     setError,
     getAcceptedObjects,
     clearImage,
-    setImage,
   } = useTaggingStore();
 
   const [showExportModal, setShowExportModal] = useState(false);
@@ -64,6 +63,11 @@ export default function Home() {
             confidence_threshold: 0.25,
             provider: provider === 'auto' ? 'google' : provider,
           },
+          // Pass image dimensions for thumbnail generation
+          image_dimensions: imageDimensions ? {
+            width: imageDimensions.naturalWidth,
+            height: imageDimensions.naturalHeight,
+          } : undefined,
         }),
         visualSearch({
           image: imageBase64,
