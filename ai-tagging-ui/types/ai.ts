@@ -83,3 +83,85 @@ export interface ExportData {
     attributes?: Record<string, AttributeValue>;
   }>;
 }
+
+/**
+ * Product match from Google Lens/Vision
+ */
+export interface ProductMatch {
+  title: string;
+  url: string;
+  score: number;
+  image_url?: string;
+  price?: string;
+  merchant?: string;
+}
+
+/**
+ * Web entity from Google Vision
+ */
+export interface WebEntity {
+  entity_id: string;
+  description: string;
+  score: number;
+}
+
+/**
+ * Visual search result (Google Lens style)
+ */
+export interface VisualSearchResult {
+  success: boolean;
+  request_id: string;
+  processing_time_ms: number;
+  web_entities: WebEntity[];
+  product_matches: ProductMatch[];
+  visually_similar_images: string[];
+  pages_with_matching_images: Array<{
+    url: string;
+    title: string;
+    thumbnail_url?: string;
+  }>;
+  error?: string;
+}
+
+/**
+ * Shopping link for fallback search
+ */
+export interface ShoppingLink {
+  title: string;
+  url: string;
+  merchant: string;
+  logo: string;
+}
+
+/**
+ * Product from shopping search
+ */
+export interface ShoppingProduct {
+  title: string;
+  url: string;
+  price?: string;
+  extracted_price?: number;
+  currency?: string;
+  image_url?: string;
+  merchant?: string;
+  rating?: number;
+  reviews_count?: number;
+  shipping?: string;
+  condition?: string;
+}
+
+/**
+ * Shopping search result
+ */
+export interface ShoppingSearchResult {
+  success: boolean;
+  request_id: string;
+  processing_time_ms: number;
+  query: string;
+  total_results?: number;
+  products: ShoppingProduct[];
+  shopping_links?: ShoppingLink[];
+  source: string;
+  message?: string;
+  error?: string;
+}

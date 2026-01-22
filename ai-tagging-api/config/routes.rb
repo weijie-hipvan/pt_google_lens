@@ -5,6 +5,14 @@ Rails.application.routes.draw do
       # Object detection endpoint
       # POST /api/v1/detections
       resources :detections, only: [:create]
+
+      # Visual search endpoint (Google Lens style)
+      # POST /api/v1/visual_searches
+      resources :visual_searches, only: [:create]
+
+      # Shopping/price search endpoint
+      # POST /api/v1/shopping_searches
+      resources :shopping_searches, only: [:create]
     end
   end
 
