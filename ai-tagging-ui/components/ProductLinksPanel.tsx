@@ -101,17 +101,54 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
   const [activeTab, setActiveTab] = useState<'products' | 'shop' | 'similar' | 'tags'>('products');
   const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
   const [isLoadingShopping, setIsLoadingShopping] = useState(false);
+  const [shoppingQuery, setShoppingQuery] = useState<string | null>(null);
 
+  // Automatically trigger shopping search when visual search completes
   useEffect(() => {
-    if (objectLabel && searchResult?.success) {
-      fetchShoppingLinks(objectLabel);
+    if (!searchResult?.success) return;
+    
+    // Determine the best query for shopping search
+    let query: string | null = null;
+    
+    // Priority 1: Use best_guess_labels from visual search (most accurate)
+    const bestGuessLabels = (searchResult as unknown as { best_guess_labels?: string[] }).best_guess_labels;
+    if (bestGuessLabels && bestGuessLabels.length > 0) {
+      query = bestGuessLabels[0];
+      console.log('[Shopping] Using best_guess_label:', query);
     }
-  }, [objectLabel, searchResult?.success]);
+    // Priority 2: Use top web entity with high score
+    else if (searchResult.web_entities && searchResult.web_entities.length > 0) {
+      const topEntity = searchResult.web_entities.find(e => e.score > 0.5 && e.description);
+      if (topEntity) {
+        query = topEntity.description;
+        console.log('[Shopping] Using web_entity:', query);
+      }
+    }
+    // Priority 3: Use objectLabel if it's not "Entire Image"
+    else if (objectLabel && objectLabel !== 'Entire Image') {
+      query = objectLabel;
+      console.log('[Shopping] Using objectLabel:', query);
+    }
+    
+    // Trigger shopping search if we have a valid query and it's different from current
+    if (query) {
+      setShoppingQuery(prevQuery => {
+        if (prevQuery !== query) {
+          fetchShoppingLinks(query!);
+          return query;
+        }
+        return prevQuery;
+      });
+    }
+     
+  }, [searchResult, objectLabel]);
 
   const fetchShoppingLinks = async (query: string) => {
+    console.log('[Shopping] Fetching shopping links for:', query);
     setIsLoadingShopping(true);
     try {
       const result = await shoppingSearch(query);
+      console.log('[Shopping] Got result:', result.success, result.products?.length, 'products');
       setShoppingResult(result);
     } catch (error) {
       console.error('Shopping search error:', error);
@@ -122,7 +159,7 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
 
   const tabs = [
     { id: 'products', label: 'Products', count: searchResult?.product_matches?.length || 0, icon: '🛒' },
-    { id: 'shop', label: 'Shop', count: shoppingResult?.shopping_links?.length || 0, icon: '💰', loading: isLoadingShopping },
+    { id: 'shop', label: 'Shop', count: (shoppingResult?.products?.length || 0) + (shoppingResult?.shopping_links?.length || 0), icon: '💰', loading: isLoadingShopping },
     { id: 'similar', label: 'Similar', count: searchResult?.visually_similar_images?.length || 0, icon: '🖼️' },
     { id: 'tags', label: 'Tags', count: searchResult?.web_entities?.length || 0, icon: '🏷️' },
   ];
@@ -138,9 +175,11 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             </div>
             <div>
               <h3 className="font-semibold text-sm text-gray-200">Visual Search</h3>
-              {objectLabel && (
+              {shoppingQuery ? (
+                <p className="text-xs text-emerald-400 truncate max-w-[150px]">🛒 {shoppingQuery}</p>
+              ) : objectLabel ? (
                 <p className="text-xs text-gray-500 truncate max-w-[150px]">{objectLabel}</p>
-              )}
+              ) : null}
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors">
@@ -241,18 +280,37 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                     {shoppingResult.products && shoppingResult.products.length > 0 && (
                       <div className="space-y-2 mb-4">
                         <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">With Prices</h4>
-                        {shoppingResult.products.slice(0, 5).map((product, idx) => (
+                        {shoppingResult.products.slice(0, 8).map((product, idx) => (
                           <a key={idx} href={product.url} target="_blank" rel="noopener noreferrer"
                             className="group block p-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20">
                             <div className="flex gap-2">
                               {product.image_url && (
-                                <img src={product.image_url} alt="" className="w-10 h-10 rounded object-cover" />
+                                <img src={product.image_url} alt="" className="w-14 h-14 rounded object-cover flex-shrink-0" />
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-200 line-clamp-1">{product.title}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight">{product.title}</p>
+                                <div className="flex items-center gap-2 mt-1">
                                   {product.price && <span className="text-sm font-bold text-emerald-400">{product.price}</span>}
-                                  {product.merchant && <span className="text-[10px] text-gray-500">{product.merchant}</span>}
+                                  {product.merchant && (
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-700 text-gray-400 rounded">{product.merchant}</span>
+                                  )}
+                                </div>
+                                {/* Rating, reviews, shipping */}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px]">
+                                  {product.rating && (
+                                    <span className="flex items-center gap-0.5 text-yellow-400">
+                                      ⭐ {product.rating.toFixed(1)}
+                                    </span>
+                                  )}
+                                  {product.reviews_count && (
+                                    <span className="text-gray-500">({product.reviews_count.toLocaleString()} reviews)</span>
+                                  )}
+                                  {product.shipping && (
+                                    <span className="text-cyan-400">🚚 {product.shipping}</span>
+                                  )}
+                                  {product.condition && (
+                                    <span className="text-orange-400">📦 {product.condition}</span>
+                                  )}
                                 </div>
                               </div>
                             </div>

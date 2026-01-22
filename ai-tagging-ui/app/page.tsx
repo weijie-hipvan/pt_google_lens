@@ -37,9 +37,12 @@ export default function Home() {
   const [cacheStatus, setCacheStatus] = useState<{ detection: boolean; search: boolean } | null>(null);
   const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
 
-  // Boost with AI - now also triggers visual search
+  // Boost with AI - runs both detection and visual search in parallel
   const handleBoost = async (provider: AIProvider) => {
-    if (!imageBase64) return;
+    if (!imageBase64) {
+      setError('No image loaded. Please upload an image first.');
+      return;
+    }
 
     const imageHash = generateImageHash(imageBase64);
     setCurrentImageHash(imageHash);
@@ -47,70 +50,91 @@ export default function Home() {
     setError(null);
     setCacheStatus(null);
     
-    // Also open the product panel and start visual search
+    // Open the product panel and set initial states
     setShowProductPanel(true);
     setIsSearching(true);
     setSearchingObjectLabel('Entire Image');
     setVisualSearchResult(null);
 
-    try {
-      // Run both in parallel
-      const [detectResult, searchResult] = await Promise.all([
-        detectObjects({
-          image: imageBase64,
-          options: {
-            max_objects: 15,
-            confidence_threshold: 0.25,
-            provider: provider === 'auto' ? 'google' : provider,
-          },
-          // Pass image dimensions for thumbnail generation
-          image_dimensions: imageDimensions ? {
-            width: imageDimensions.naturalWidth,
-            height: imageDimensions.naturalHeight,
-          } : undefined,
-        }),
-        visualSearch({
-          image: imageBase64,
-          options: { max_results: 20 },
-        }),
-      ]);
+    // Run detection and visual search separately to handle errors independently
+    let detectResult: Awaited<ReturnType<typeof detectObjects>> | null = null;
+    let searchResult: Awaited<ReturnType<typeof visualSearch>> | null = null;
 
-      // Track cache status
-      setCacheStatus({
-        detection: detectResult.fromCache || false,
-        search: searchResult.fromCache || false,
+    try {
+      // Start both requests
+      const detectPromise = detectObjects({
+        image: imageBase64,
+        options: {
+          max_objects: 15,
+          confidence_threshold: 0.25,
+          provider: provider === 'auto' ? 'google' : provider,
+        },
+        image_dimensions: imageDimensions ? {
+          width: imageDimensions.naturalWidth,
+          height: imageDimensions.naturalHeight,
+        } : undefined,
       });
 
+      const searchPromise = visualSearch({
+        image: imageBase64,
+        options: { max_results: 20 },
+      });
+
+      // Wait for both to complete (don't fail if one fails)
+      const results = await Promise.allSettled([detectPromise, searchPromise]);
+
       // Handle detection result
-      if (detectResult.success) {
-        setObjects(detectResult.objects);
+      if (results[0].status === 'fulfilled') {
+        detectResult = results[0].value;
+        console.log('[Boost] Detection result:', detectResult.success, detectResult.objects?.length, 'objects');
         
-        // Save to history
-        addToHistory({
-          timestamp: Date.now(),
-          imageHash,
-          imageThumbnail: imageBase64.length < 50000 ? imageBase64 : undefined, // Only save small thumbnails
-          objectCount: detectResult.objects.length,
-          provider,
-        });
+        if (detectResult.success) {
+          setObjects(detectResult.objects);
+          
+          // Save to history
+          addToHistory({
+            timestamp: Date.now(),
+            imageHash,
+            imageThumbnail: imageBase64.length < 50000 ? imageBase64 : undefined,
+            objectCount: detectResult.objects.length,
+            provider,
+          });
+        } else {
+          setError(detectResult.error || 'Detection failed');
+        }
       } else {
-        setError(detectResult.error || 'Detection failed');
+        console.error('[Boost] Detection failed:', results[0].reason);
+        setError(`Detection error: ${results[0].reason?.message || 'Unknown error'}`);
       }
 
       // Handle visual search result
-      setVisualSearchResult(searchResult);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setVisualSearchResult({
-        success: false,
-        request_id: '',
-        processing_time_ms: 0,
-        web_entities: [],
-        product_matches: [],
-        visually_similar_images: [],
-        pages_with_matching_images: [],
-        error: err instanceof Error ? err.message : 'Search failed',
+      if (results[1].status === 'fulfilled') {
+        searchResult = results[1].value;
+        console.log('[Boost] Search result:', searchResult.success, searchResult.product_matches?.length, 'products');
+        setVisualSearchResult(searchResult);
+      } else {
+        console.error('[Boost] Search failed:', results[1].reason);
+        setVisualSearchResult({
+          success: false,
+          request_id: '',
+          processing_time_ms: 0,
+          web_entities: [],
+          product_matches: [],
+          visually_similar_images: [],
+          pages_with_matching_images: [],
+          error: results[1].reason?.message || 'Search failed',
+        });
+      }
+
+      // Track cache status
+      setCacheStatus({
+        detection: detectResult?.fromCache || false,
+        search: searchResult?.fromCache || false,
       });
+
+    } catch (err) {
+      console.error('[Boost] Unexpected error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setLoading(false);
       setIsSearching(false);
