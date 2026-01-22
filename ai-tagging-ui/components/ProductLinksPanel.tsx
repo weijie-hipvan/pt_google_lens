@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { VisualSearchResult, WebEntity, ShoppingSearchResult, ShoppingLink } from '@/types/ai';
+import { useState, useEffect, useCallback } from 'react';
+import { VisualSearchResult, WebEntity, ShoppingSearchResult, ShoppingLink, RelatedProduct } from '@/types/ai';
 import { shoppingSearch } from '@/lib/api';
 
 interface ProductLinksPanelProps {
   searchResult: VisualSearchResult | null;
   isLoading: boolean;
   objectLabel?: string;
+  objectId?: string; // ID of the object being searched
   onClose: () => void;
+  onProductsFound?: (objectId: string, products: RelatedProduct[]) => void; // Callback when products found
 }
 
 function ShoppingLinkCard({ link }: { link: ShoppingLink }) {
@@ -58,29 +60,45 @@ function SimilarImageGrid({ images }: { images: string[] }) {
   );
 }
 
-export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, onClose }: ProductLinksPanelProps) {
+export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, objectId, onClose, onProductsFound }: ProductLinksPanelProps) {
   const [activeTab, setActiveTab] = useState<'products' | 'similar' | 'tags'>('products');
   const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
   const [isLoadingShopping, setIsLoadingShopping] = useState(false);
+
+  const fetchShoppingLinks = useCallback(async (query: string) => {
+    setIsLoadingShopping(true);
+    try {
+      const result = await shoppingSearch(query);
+      setShoppingResult(result);
+      
+      // Save products to object if callback provided and objectId exists
+      if (result.success && result.products && result.products.length > 0 && objectId && onProductsFound) {
+        const relatedProducts: RelatedProduct[] = result.products.map(p => ({
+          title: p.title,
+          url: p.url,
+          price: p.price,
+          extracted_price: p.extracted_price,
+          image_url: p.image_url,
+          merchant: p.merchant,
+          rating: p.rating,
+          reviews_count: p.reviews_count,
+          shipping: p.shipping,
+        }));
+        onProductsFound(objectId, relatedProducts);
+      }
+    } catch (error) {
+      console.error('Shopping search error:', error);
+    } finally {
+      setIsLoadingShopping(false);
+    }
+  }, [objectId, onProductsFound]);
 
   // Trigger shopping search when objectLabel changes (user clicks "Find Similar")
   useEffect(() => {
     if (objectLabel && objectLabel !== 'Entire Image' && searchResult?.success) {
       fetchShoppingLinks(objectLabel);
     }
-  }, [objectLabel, searchResult?.success]);
-
-  const fetchShoppingLinks = async (query: string) => {
-    setIsLoadingShopping(true);
-    try {
-      const result = await shoppingSearch(query);
-      setShoppingResult(result);
-    } catch (error) {
-      console.error('Shopping search error:', error);
-    } finally {
-      setIsLoadingShopping(false);
-    }
-  };
+  }, [objectLabel, searchResult?.success, fetchShoppingLinks]);
 
   // Products tab now shows shopping results (with prices) - the most useful for tagging
   const tabs = [

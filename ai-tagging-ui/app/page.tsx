@@ -25,6 +25,7 @@ export default function Home() {
     setError,
     getAcceptedObjects,
     clearImage,
+    setObjectRelatedProducts,
   } = useTaggingStore();
 
   const [showExportModal, setShowExportModal] = useState(false);
@@ -33,6 +34,7 @@ export default function Home() {
   const [visualSearchResult, setVisualSearchResult] = useState<VisualSearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchingObjectLabel, setSearchingObjectLabel] = useState<string | undefined>();
+  const [searchingObjectId, setSearchingObjectId] = useState<string | undefined>();
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>('google');
   const [cacheStatus, setCacheStatus] = useState<{ detection: boolean; search: boolean } | null>(null);
   const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
@@ -187,6 +189,7 @@ export default function Home() {
     setShowProductPanel(true);
     setIsSearching(true);
     setSearchingObjectLabel(obj.label);
+    setSearchingObjectId(objectId); // Track which object we're searching for
     setVisualSearchResult(null);
 
     try {
@@ -218,6 +221,7 @@ export default function Home() {
     setShowProductPanel(true);
     setIsSearching(true);
     setSearchingObjectLabel('Entire Image');
+    setSearchingObjectId(undefined); // No specific object for whole image search
     setVisualSearchResult(null);
 
     try {
@@ -403,7 +407,9 @@ export default function Home() {
                 searchResult={visualSearchResult}
                 isLoading={isSearching}
                 objectLabel={searchingObjectLabel}
+                objectId={searchingObjectId}
                 onClose={() => setShowProductPanel(false)}
+                onProductsFound={setObjectRelatedProducts}
               />
             </div>
           )}

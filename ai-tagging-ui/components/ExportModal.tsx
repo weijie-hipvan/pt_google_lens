@@ -18,6 +18,10 @@ export default function ExportModal({
 }: ExportModalProps) {
   const [copied, setCopied] = useState(false);
 
+  // Count objects with related products
+  const objectsWithProducts = objects.filter(obj => obj.related_products && obj.related_products.length > 0);
+  const totalRelatedProducts = objects.reduce((sum, obj) => sum + (obj.related_products?.length || 0), 0);
+
   const exportData: ExportData = {
     exported_at: new Date().toISOString(),
     image_dimensions: imageDimensions
@@ -41,6 +45,7 @@ export default function ExportModal({
         : undefined,
       attributes: obj.attributes,
       thumbnail_url: obj.thumbnail_url,
+      related_products: obj.related_products, // Include related products from shopping search
     })),
   };
 
@@ -86,7 +91,19 @@ export default function ExportModal({
       <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in fade-in zoom-in duration-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-100">Export Results</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-100">Export Results</h2>
+            <div className="flex items-center gap-3 mt-1 text-sm">
+              <span className="text-gray-400">
+                📦 {objects.length} objects
+              </span>
+              {totalRelatedProducts > 0 && (
+                <span className="text-emerald-400">
+                  🛒 {totalRelatedProducts} products ({objectsWithProducts.length} objects with products)
+                </span>
+              )}
+            </div>
+          </div>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-gray-700 transition-colors"
