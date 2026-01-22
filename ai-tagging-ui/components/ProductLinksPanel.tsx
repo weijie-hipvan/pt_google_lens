@@ -186,42 +186,108 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                 ) : shoppingResult?.success ? (
                   <>
                     {shoppingResult.products && shoppingResult.products.length > 0 && (
-                      <div className="space-y-2">
-                        {shoppingResult.products.slice(0, 10).map((product, idx) => (
-                          <a key={idx} href={product.url} target="_blank" rel="noopener noreferrer"
-                            className="group block p-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all">
-                            <div className="flex gap-2">
+                      <div className="space-y-3">
+                        {/* Summary header */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">{shoppingResult.products.length} products found</span>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const data = shoppingResult.products?.map(p => ({
+                                title: p.title,
+                                price: p.price,
+                                merchant: p.merchant,
+                                url: p.url,
+                                rating: p.rating,
+                                reviews: p.reviews_count,
+                                shipping: p.shipping
+                              }));
+                              navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                            }}
+                            className="text-[10px] px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
+                          >
+                            📋 Copy All
+                          </button>
+                        </div>
+                        {shoppingResult.products.slice(0, 12).map((product, idx) => (
+                          <div key={idx} className="group p-3 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all">
+                            <div className="flex gap-3">
                               {product.image_url && (
-                                <img src={product.image_url} alt="" className="w-14 h-14 rounded object-cover flex-shrink-0" />
+                                <a href={product.url} target="_blank" rel="noopener noreferrer">
+                                  <img src={product.image_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 hover:ring-2 hover:ring-emerald-500 transition-all" />
+                                </a>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight group-hover:text-emerald-300 transition-colors">{product.title}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  {product.price && <span className="text-sm font-bold text-emerald-400">{product.price}</span>}
+                                <a href={product.url} target="_blank" rel="noopener noreferrer" className="block">
+                                  <p className="text-sm font-medium text-gray-200 line-clamp-2 leading-snug group-hover:text-emerald-300 transition-colors">{product.title}</p>
+                                </a>
+                                
+                                {/* Price & Merchant Row */}
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  {product.price && (
+                                    <span className="text-base font-bold text-emerald-400">{product.price}</span>
+                                  )}
                                   {product.merchant && (
-                                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-700 text-gray-400 rounded">{product.merchant}</span>
+                                    <span className="text-xs px-2 py-0.5 bg-gray-700 text-gray-300 rounded">{product.merchant}</span>
                                   )}
                                 </div>
-                                {/* Rating, reviews, shipping */}
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px]">
+                                
+                                {/* Rating & Reviews Row */}
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs">
                                   {product.rating && (
-                                    <span className="flex items-center gap-0.5 text-yellow-400">
-                                      ⭐ {product.rating.toFixed(1)}
+                                    <span className="flex items-center gap-1 text-yellow-400">
+                                      <span>⭐</span> 
+                                      <span className="font-medium">{product.rating.toFixed(1)}</span>
                                     </span>
                                   )}
                                   {product.reviews_count && (
                                     <span className="text-gray-500">({product.reviews_count.toLocaleString()} reviews)</span>
                                   )}
+                                </div>
+                                
+                                {/* Shipping & Condition Row */}
+                                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
                                   {product.shipping && (
-                                    <span className="text-cyan-400">🚚 {product.shipping}</span>
+                                    <span className="text-cyan-400 flex items-center gap-1">
+                                      <span>🚚</span> {product.shipping}
+                                    </span>
                                   )}
                                   {product.condition && (
-                                    <span className="text-orange-400">📦 {product.condition}</span>
+                                    <span className="text-orange-400 flex items-center gap-1">
+                                      <span>📦</span> {product.condition}
+                                    </span>
                                   )}
                                 </div>
                               </div>
+                              
+                              {/* Copy button */}
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const data = {
+                                    title: product.title,
+                                    price: product.price,
+                                    extracted_price: product.extracted_price,
+                                    merchant: product.merchant,
+                                    url: product.url,
+                                    image_url: product.image_url,
+                                    rating: product.rating,
+                                    reviews_count: product.reviews_count,
+                                    shipping: product.shipping,
+                                    condition: product.condition
+                                  };
+                                  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-white transition-all self-start"
+                                title="Copy product data"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
                             </div>
-                          </a>
+                          </div>
                         ))}
                       </div>
                     )}

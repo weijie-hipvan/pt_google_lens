@@ -11,7 +11,7 @@ import ActionBar, { AIProvider } from '@/components/ActionBar';
 import ExportModal from '@/components/ExportModal';
 import ProductLinksPanel from '@/components/ProductLinksPanel';
 import HistoryPanel from '@/components/HistoryPanel';
-import { generateImageHash, addToHistory, getCachedResult } from '@/lib/cache';
+import { generateImageHash, addToHistory, getCachedResult, clearCacheForImage } from '@/lib/cache';
 
 export default function Home() {
   const {
@@ -38,7 +38,7 @@ export default function Home() {
   const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
 
   // Boost with AI - runs both detection and visual search in parallel
-  const handleBoost = async (provider: AIProvider) => {
+  const handleBoost = async (provider: AIProvider, skipCache: boolean = false) => {
     if (!imageBase64) {
       setError('No image loaded. Please upload an image first.');
       return;
@@ -46,6 +46,13 @@ export default function Home() {
 
     const imageHash = generateImageHash(imageBase64);
     setCurrentImageHash(imageHash);
+    
+    // If skipCache is true, clear cache for this image first
+    if (skipCache) {
+      clearCacheForImage(imageHash);
+      console.log('[Boost] Cache cleared for image, fetching fresh results...');
+    }
+    
     setLoading(true);
     setError(null);
     setCacheStatus(null);
@@ -60,6 +67,9 @@ export default function Home() {
     let detectResult: Awaited<ReturnType<typeof detectObjects>> | null = null;
     let searchResult: Awaited<ReturnType<typeof visualSearch>> | null = null;
 
+    // Use cache or not based on skipCache flag
+    const useCache = !skipCache;
+
     try {
       // Start both requests
       const detectPromise = detectObjects({
@@ -73,12 +83,12 @@ export default function Home() {
           width: imageDimensions.naturalWidth,
           height: imageDimensions.naturalHeight,
         } : undefined,
-      });
+      }, useCache);
 
       const searchPromise = visualSearch({
         image: imageBase64,
         options: { max_results: 20 },
-      });
+      }, useCache);
 
       // Wait for both to complete (don't fail if one fails)
       const results = await Promise.allSettled([detectPromise, searchPromise]);
@@ -277,12 +287,30 @@ export default function Home() {
                 >
                   🔍 Visual Search
                 </button>
+                {/* Refresh button - force re-fetch without cache */}
+                {currentImageHash && (
+                  <button
+                    onClick={() => handleBoost(selectedProvider, true)}
+                    disabled={isSearching}
+                    title="Clear cache and re-analyze"
+                    className="px-3 py-2 rounded-lg text-sm font-medium text-cyan-400 
+                               hover:bg-cyan-500/20 transition-colors disabled:opacity-50
+                               flex items-center gap-1.5"
+                  >
+                    🔄 Refresh
+                  </button>
+                )}
                 <button
                   onClick={() => {
+                    // Clear cache for current image before clearing
+                    if (currentImageHash) {
+                      clearCacheForImage(currentImageHash);
+                    }
                     clearImage();
                     setCurrentImageHash(undefined);
                     setShowProductPanel(false);
                     setVisualSearchResult(null);
+                    setCacheStatus(null);
                   }}
                   className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 
                              hover:text-white hover:bg-gray-800/50 transition-colors"
@@ -339,11 +367,11 @@ export default function Home() {
           onProviderChange={setSelectedProvider}
         />
 
-        {/* Editor Area */}
+        {/* Editor Area - Larger panels for more info */}
         <div className="mt-4 flex gap-3" style={{ height: 'calc(100vh - 180px)' }}>
           {/* History Panel */}
           {showHistoryPanel && (
-            <div className="w-72 rounded-xl border border-gray-700/30 overflow-hidden bg-gray-800/50 flex-shrink-0">
+            <div className="w-80 rounded-xl border border-gray-700/30 overflow-hidden bg-gray-800/50 flex-shrink-0">
               <HistoryPanel
                 onLoadHistory={handleLoadHistory}
                 currentImageHash={currentImageHash}
@@ -352,23 +380,25 @@ export default function Home() {
             </div>
           )}
 
-          {/* Canvas / Uploader - Constrained max size */}
+          {/* Canvas / Uploader - Smaller when panels open */}
           <div className={`bg-gray-800/30 rounded-xl border border-gray-700/30 overflow-hidden transition-all duration-300 ${
-            showProductPanel || showHistoryPanel ? 'flex-1 max-w-[55%]' : 'flex-1 max-w-[65%]'
+            showProductPanel && showHistoryPanel ? 'flex-1 min-w-[400px]' : 
+            showProductPanel ? 'flex-1 min-w-[450px] max-w-[50%]' : 
+            showHistoryPanel ? 'flex-1 max-w-[55%]' : 'flex-1 max-w-[60%]'
           }`}>
             {imageUrl ? <CanvasViewer /> : <ImageUploader />}
           </div>
 
-          {/* Object List Sidebar */}
+          {/* Object List Sidebar - Expanded for more info */}
           <div className={`bg-gray-800/50 rounded-xl border border-gray-700/30 overflow-hidden transition-all duration-300 flex-shrink-0 ${
-            showProductPanel ? 'w-60' : 'w-72'
+            showProductPanel ? 'w-80' : 'w-96'
           }`}>
             <ObjectList onFindSimilar={handleFindSimilar} />
           </div>
 
-          {/* Product Links Panel */}
+          {/* Product Links Panel - Expanded for product details */}
           {showProductPanel && (
-            <div className="w-80 rounded-xl border border-gray-700/30 overflow-hidden bg-gray-800/50 flex-shrink-0">
+            <div className="w-96 rounded-xl border border-gray-700/30 overflow-hidden bg-gray-800/50 flex-shrink-0">
               <ProductLinksPanel
                 searchResult={visualSearchResult}
                 isLoading={isSearching}
