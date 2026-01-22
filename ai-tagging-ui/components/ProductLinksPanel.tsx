@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { VisualSearchResult, ProductMatch, WebEntity, ShoppingSearchResult, ShoppingLink } from '@/types/ai';
+import { VisualSearchResult, WebEntity, ShoppingSearchResult, ShoppingLink } from '@/types/ai';
 import { shoppingSearch } from '@/lib/api';
 
 interface ProductLinksPanelProps {
@@ -9,45 +9,6 @@ interface ProductLinksPanelProps {
   isLoading: boolean;
   objectLabel?: string;
   onClose: () => void;
-}
-
-function ProductCard({ product }: { product: ProductMatch }) {
-  return (
-    <a
-      href={product.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-lg
-                 border border-gray-600/30 hover:border-cyan-500/30 transition-all"
-    >
-      <div className="flex gap-3">
-        <div className="w-14 h-14 flex-shrink-0 bg-gray-700 rounded-lg overflow-hidden">
-          {product.image_url ? (
-            <img src={product.image_url} alt={product.title} className="w-full h-full object-cover"
-              onError={(e) => (e.target as HTMLImageElement).style.display = 'none'} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-500 text-xl">📷</div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-medium text-gray-200 line-clamp-2 group-hover:text-cyan-400 transition-colors leading-tight">
-            {product.title}
-          </h4>
-          <div className="flex items-center gap-2 mt-1.5">
-            {product.merchant && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded">
-                {product.merchant}
-              </span>
-            )}
-            <span className="text-[10px] text-gray-500">{(product.score * 100).toFixed(0)}%</span>
-          </div>
-          {product.price && (
-            <span className="text-sm font-bold text-emerald-400 mt-1 block">{product.price}</span>
-          )}
-        </div>
-      </div>
-    </a>
-  );
 }
 
 function ShoppingLinkCard({ link }: { link: ShoppingLink }) {
@@ -98,7 +59,7 @@ function SimilarImageGrid({ images }: { images: string[] }) {
 }
 
 export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, onClose }: ProductLinksPanelProps) {
-  const [activeTab, setActiveTab] = useState<'products' | 'shop' | 'similar' | 'tags'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'similar' | 'tags'>('products');
   const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
   const [isLoadingShopping, setIsLoadingShopping] = useState(false);
 
@@ -121,9 +82,9 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
     }
   };
 
+  // Products tab now shows shopping results (with prices) - the most useful for tagging
   const tabs = [
-    { id: 'products', label: 'Products', count: searchResult?.product_matches?.length || 0, icon: '🛒' },
-    { id: 'shop', label: 'Shop', count: shoppingResult?.products?.length || shoppingResult?.shopping_links?.length || 0, icon: '💰', loading: isLoadingShopping },
+    { id: 'products', label: 'Products', count: shoppingResult?.products?.length || shoppingResult?.shopping_links?.length || 0, icon: '🛒', loading: isLoadingShopping },
     { id: 'similar', label: 'Similar', count: searchResult?.visually_similar_images?.length || 0, icon: '🖼️' },
     { id: 'tags', label: 'Tags', count: searchResult?.web_entities?.length || 0, icon: '🏷️' },
   ];
@@ -214,43 +175,27 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-3">
-            {/* Products Tab */}
+            {/* Products Tab - Shows shopping results with prices */}
             {activeTab === 'products' && (
-              <div className="space-y-2">
-                {searchResult?.product_matches && searchResult.product_matches.length > 0 ? (
-                  searchResult.product_matches.map((product, idx) => (
-                    <ProductCard key={idx} product={product} />
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <p className="text-sm">No products found</p>
-                    <p className="text-xs mt-1">Try the Shop tab for retailers</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Shop Links Tab */}
-            {activeTab === 'shop' && (
               <div className="space-y-3">
                 {isLoadingShopping ? (
                   <div className="flex items-center justify-center py-6">
                     <div className="w-6 h-6 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin"></div>
+                    <span className="ml-2 text-sm text-gray-400">Finding products...</span>
                   </div>
                 ) : shoppingResult?.success ? (
                   <>
                     {shoppingResult.products && shoppingResult.products.length > 0 && (
-                      <div className="space-y-2 mb-4">
-                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">With Prices</h4>
-                        {shoppingResult.products.slice(0, 8).map((product, idx) => (
+                      <div className="space-y-2">
+                        {shoppingResult.products.slice(0, 10).map((product, idx) => (
                           <a key={idx} href={product.url} target="_blank" rel="noopener noreferrer"
-                            className="group block p-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                            className="group block p-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all">
                             <div className="flex gap-2">
                               {product.image_url && (
                                 <img src={product.image_url} alt="" className="w-14 h-14 rounded object-cover flex-shrink-0" />
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight">{product.title}</p>
+                                <p className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight group-hover:text-emerald-300 transition-colors">{product.title}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   {product.price && <span className="text-sm font-bold text-emerald-400">{product.price}</span>}
                                   {product.merchant && (
@@ -280,10 +225,22 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                         ))}
                       </div>
                     )}
-                    {shoppingResult.shopping_links && shoppingResult.shopping_links.length > 0 && (
+                    {/* Show quick search links if no products with prices */}
+                    {(!shoppingResult.products || shoppingResult.products.length === 0) && 
+                     shoppingResult.shopping_links && shoppingResult.shopping_links.length > 0 && (
                       <div className="space-y-1.5">
-                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Quick Search</h4>
+                        <p className="text-xs text-gray-500 mb-2">No products with prices found. Search on:</p>
                         {shoppingResult.shopping_links.map((link, idx) => (
+                          <ShoppingLinkCard key={idx} link={link} />
+                        ))}
+                      </div>
+                    )}
+                    {/* Show quick search links below products if both exist */}
+                    {shoppingResult.products && shoppingResult.products.length > 0 && 
+                     shoppingResult.shopping_links && shoppingResult.shopping_links.length > 0 && (
+                      <div className="space-y-1.5 mt-4 pt-3 border-t border-gray-700/50">
+                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Search More</h4>
+                        {shoppingResult.shopping_links.slice(0, 4).map((link, idx) => (
                           <ShoppingLinkCard key={idx} link={link} />
                         ))}
                       </div>
@@ -291,11 +248,14 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                   </>
                 ) : (
                   <div className="text-center py-6 text-gray-500">
-                    <p className="text-sm">Failed to load</p>
-                    <button onClick={() => objectLabel && fetchShoppingLinks(objectLabel)}
-                      className="mt-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs">
-                      Retry
-                    </button>
+                    <p className="text-sm">No products loaded yet</p>
+                    <p className="text-xs mt-1 text-gray-600">Click &quot;Find Similar&quot; on an object to search</p>
+                    {objectLabel && (
+                      <button onClick={() => fetchShoppingLinks(objectLabel)}
+                        className="mt-3 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors">
+                        🔍 Search for &quot;{objectLabel}&quot;
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
