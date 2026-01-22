@@ -101,54 +101,18 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
   const [activeTab, setActiveTab] = useState<'products' | 'shop' | 'similar' | 'tags'>('products');
   const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
   const [isLoadingShopping, setIsLoadingShopping] = useState(false);
-  const [shoppingQuery, setShoppingQuery] = useState<string | null>(null);
 
-  // Automatically trigger shopping search when visual search completes
+  // Trigger shopping search when objectLabel changes (user clicks "Find Similar")
   useEffect(() => {
-    if (!searchResult?.success) return;
-    
-    // Determine the best query for shopping search
-    let query: string | null = null;
-    
-    // Priority 1: Use best_guess_labels from visual search (most accurate)
-    const bestGuessLabels = (searchResult as unknown as { best_guess_labels?: string[] }).best_guess_labels;
-    if (bestGuessLabels && bestGuessLabels.length > 0) {
-      query = bestGuessLabels[0];
-      console.log('[Shopping] Using best_guess_label:', query);
+    if (objectLabel && objectLabel !== 'Entire Image' && searchResult?.success) {
+      fetchShoppingLinks(objectLabel);
     }
-    // Priority 2: Use top web entity with high score
-    else if (searchResult.web_entities && searchResult.web_entities.length > 0) {
-      const topEntity = searchResult.web_entities.find(e => e.score > 0.5 && e.description);
-      if (topEntity) {
-        query = topEntity.description;
-        console.log('[Shopping] Using web_entity:', query);
-      }
-    }
-    // Priority 3: Use objectLabel if it's not "Entire Image"
-    else if (objectLabel && objectLabel !== 'Entire Image') {
-      query = objectLabel;
-      console.log('[Shopping] Using objectLabel:', query);
-    }
-    
-    // Trigger shopping search if we have a valid query and it's different from current
-    if (query) {
-      setShoppingQuery(prevQuery => {
-        if (prevQuery !== query) {
-          fetchShoppingLinks(query!);
-          return query;
-        }
-        return prevQuery;
-      });
-    }
-     
-  }, [searchResult, objectLabel]);
+  }, [objectLabel, searchResult?.success]);
 
   const fetchShoppingLinks = async (query: string) => {
-    console.log('[Shopping] Fetching shopping links for:', query);
     setIsLoadingShopping(true);
     try {
       const result = await shoppingSearch(query);
-      console.log('[Shopping] Got result:', result.success, result.products?.length, 'products');
       setShoppingResult(result);
     } catch (error) {
       console.error('Shopping search error:', error);
@@ -159,7 +123,7 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
 
   const tabs = [
     { id: 'products', label: 'Products', count: searchResult?.product_matches?.length || 0, icon: '🛒' },
-    { id: 'shop', label: 'Shop', count: (shoppingResult?.products?.length || 0) + (shoppingResult?.shopping_links?.length || 0), icon: '💰', loading: isLoadingShopping },
+    { id: 'shop', label: 'Shop', count: shoppingResult?.products?.length || shoppingResult?.shopping_links?.length || 0, icon: '💰', loading: isLoadingShopping },
     { id: 'similar', label: 'Similar', count: searchResult?.visually_similar_images?.length || 0, icon: '🖼️' },
     { id: 'tags', label: 'Tags', count: searchResult?.web_entities?.length || 0, icon: '🏷️' },
   ];
@@ -175,11 +139,9 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             </div>
             <div>
               <h3 className="font-semibold text-sm text-gray-200">Visual Search</h3>
-              {shoppingQuery ? (
-                <p className="text-xs text-emerald-400 truncate max-w-[150px]">🛒 {shoppingQuery}</p>
-              ) : objectLabel ? (
+              {objectLabel && (
                 <p className="text-xs text-gray-500 truncate max-w-[150px]">{objectLabel}</p>
-              ) : null}
+              )}
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors">
