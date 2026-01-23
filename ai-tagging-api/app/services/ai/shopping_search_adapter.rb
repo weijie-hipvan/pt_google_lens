@@ -98,20 +98,22 @@ module Ai
     # Main search method - tries image search first (if image_url provided), then keyword search
     # @param query [String] Search query (keyword)
     # @param image_url [String] Optional original image URL for Google Lens (must be PUBLIC)
-    # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object
+    # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object (normalized 0-1)
+    # @param image_dimensions [Hash] Optional {width, height} actual image dimensions for accurate crop
     # @param options [Hash] Additional options
-    def self.search(query:, image_url: nil, bounding_box: nil, options: {})
+    def self.search(query:, image_url: nil, bounding_box: nil, image_dimensions: nil, options: {})
       puts "=" * 60
       puts "[ShoppingSearch] search() called"
       puts "[ShoppingSearch] Query: #{query}"
       puts "[ShoppingSearch] Image URL: #{image_url.present? ? image_url.first(50) + '...' : 'nil'}"
       puts "[ShoppingSearch] Bounding Box: #{bounding_box.present? ? bounding_box : 'nil'}"
+      puts "[ShoppingSearch] Image Dimensions: #{image_dimensions.present? ? image_dimensions : 'nil (will estimate)'}"
       puts "=" * 60
 
       # PRIORITY 1: Try Google Lens image search if image_url provided
       if image_url.present? && ENV["SERPAPI_KEY"].present?
         puts "[ShoppingSearch] -> PRIORITY 1: Trying Google Lens image search..."
-        result = search_by_image(image_url: image_url, bounding_box: bounding_box, options: options)
+        result = search_by_image(image_url: image_url, bounding_box: bounding_box, image_dimensions: image_dimensions, options: options)
 
         if result[:success] && result[:products].present?
           puts "[ShoppingSearch] -> Google Lens returned #{result[:products].length} products!"
@@ -148,13 +150,16 @@ module Ai
     # Search by image using Google Lens Products API
     # Returns visually similar products - more accurate than keyword search
     # @param image_url [String] Public image URL
-    # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object
-    def self.search_by_image(image_url:, bounding_box: nil, options: {})
+    # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object (normalized 0-1)
+    # @param image_dimensions [Hash] Optional {width, height} actual image dimensions for accurate crop
+    def self.search_by_image(image_url:, bounding_box: nil, image_dimensions: nil, options: {})
       puts "[ShoppingSearch] -> Calling GoogleLensProductsAdapter.search..."
       puts "[ShoppingSearch] -> Bounding box: #{bounding_box.present? ? bounding_box : 'full image'}"
+      puts "[ShoppingSearch] -> Image dimensions: #{image_dimensions.present? ? image_dimensions : 'nil (will estimate)'}"
       result = Ai::GoogleLensProductsAdapter.search(
         image_url: image_url,
         bounding_box: bounding_box,
+        image_dimensions: image_dimensions,
         options: options
       )
 

@@ -10,9 +10,10 @@ module Ai
     # Requires SERPAPI_KEY environment variable
     # @param image_url [String] Public image URL (must be publicly accessible)
     # @param bounding_box [Hash] Optional {x, y, width, height} normalized (0-1) to crop specific object
+    # @param image_dimensions [Hash] Optional {width, height} actual image dimensions for accurate crop calculation
     # @param options [Hash] Additional options (max_results, language, country)
     # @return [Hash] Search results with products array
-    def self.search(image_url:, bounding_box: nil, options: {})
+    def self.search(image_url:, bounding_box: nil, image_dimensions: nil, options: {})
       api_key = ENV["SERPAPI_KEY"]
       country = "sg"
 
@@ -59,8 +60,9 @@ module Ai
       # Handle bounding box cropping for imgix URLs
       if bounding_box.present? && is_imgix_url?(image_url)
         puts "[GoogleLens] Bounding box provided: #{bounding_box}"
+        puts "[GoogleLens] Image dimensions: #{image_dimensions.present? ? image_dimensions : 'nil (will estimate)'}"
         puts "[GoogleLens] -> Using imgix server-side crop"
-        cropped_url = build_imgix_crop_url(image_url, bounding_box)
+        cropped_url = build_imgix_crop_url(image_url, bounding_box, image_dimensions)
         params[:url] = cropped_url
         puts "[GoogleLens] -> Cropped URL: #{cropped_url.first(100)}..."
       else
@@ -104,14 +106,15 @@ module Ai
     # Build imgix URL with crop parameters
     # @param url [String] Original imgix URL
     # @param bounding_box [Hash] {x, y, width, height} normalized (0-1)
+    # @param image_dimensions [Hash] Optional {width, height} actual image dimensions
     # @return [String] Cropped imgix URL
-    def self.build_imgix_crop_url(url, bounding_box)
+    def self.build_imgix_crop_url(url, bounding_box, image_dimensions = nil)
       uri = URI.parse(url)
       params = URI.decode_www_form(uri.query || "").to_h
 
       # imgix rect format: rect=x,y,w,h (in pixels)
       # The bounding_box is normalized (0-1) relative to the DISPLAYED image
-      # We need to convert to pixels relative to the original rect
+      # We need to convert to pixels relative to the original rect or actual image dimensions
 
       orig_rect = params["rect"]
 
@@ -125,12 +128,23 @@ module Ai
         crop_y = orig_y + (bounding_box[:y].to_f * orig_h).to_i
         crop_w = (bounding_box[:width].to_f * orig_w).to_i
         crop_h = (bounding_box[:height].to_f * orig_h).to_i
+      elsif image_dimensions.present?
+        # Use actual image dimensions from client (most accurate!)
+        img_width = image_dimensions[:width].to_i
+        img_height = image_dimensions[:height].to_i
+
+        puts "[imgix] Using actual image dimensions: #{img_width}x#{img_height}"
+
+        crop_x = (bounding_box[:x].to_f * img_width).to_i
+        crop_y = (bounding_box[:y].to_f * img_height).to_i
+        crop_w = (bounding_box[:width].to_f * img_width).to_i
+        crop_h = (bounding_box[:height].to_f * img_height).to_i
       else
-        # No rect - use rendered dimensions (w * dpr) as reference
+        # No rect and no dimensions - fallback to estimates (less accurate)
         render_width = (params["w"]&.to_i || 1000) * (params["dpr"]&.to_i || 1)
         render_height = (render_width * 1.5).to_i  # Estimate aspect ratio
 
-        puts "[imgix] No original rect, using render size: #{render_width}x#{render_height}"
+        puts "[imgix] ⚠️ No dimensions provided, estimating: #{render_width}x#{render_height}"
 
         crop_x = (bounding_box[:x].to_f * render_width).to_i
         crop_y = (bounding_box[:y].to_f * render_height).to_i
