@@ -20,7 +20,7 @@ const PROVIDERS: { value: AIProvider; label: string; icon: string; description: 
   { value: 'auto', label: 'Auto (Best)', icon: '✨', description: 'Automatically select' },
 ];
 
-export default function ActionBar({ onBoost, onExport, selectedProvider, onProviderChange, cacheEnabled = false, onCacheToggle }: ActionBarProps) {
+export default function ActionBar({ onBoost, onExport, selectedProvider, onProviderChange, cacheEnabled = true, onCacheToggle }: ActionBarProps) {
   const {
     imageUrl,
     objects,
