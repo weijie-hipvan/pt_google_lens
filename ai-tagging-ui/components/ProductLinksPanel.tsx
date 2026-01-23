@@ -64,8 +64,19 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
   const [activeTab, setActiveTab] = useState<'products' | 'similar' | 'tags'>('products');
   const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
   const [isLoadingShopping, setIsLoadingShopping] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState(objectLabel || '');
+  const [lastSearchedKeyword, setLastSearchedKeyword] = useState('');
+
+  // Update searchKeyword when objectLabel changes
+  useEffect(() => {
+    if (objectLabel && objectLabel !== 'Entire Image') {
+      setSearchKeyword(objectLabel);
+    }
+  }, [objectLabel]);
 
   const fetchShoppingLinks = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    setLastSearchedKeyword(query);
     setIsLoadingShopping(true);
     try {
       const result = await shoppingSearch(query);
@@ -93,12 +104,13 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
     }
   }, [objectId, onProductsFound]);
 
-  // Trigger shopping search when objectLabel changes (user clicks "Find Similar")
+  // Auto-trigger shopping search when objectLabel changes and we have searchResult
+  // Only auto-search if not already searched this session
   useEffect(() => {
-    if (objectLabel && objectLabel !== 'Entire Image' && searchResult?.success) {
+    if (objectLabel && objectLabel !== 'Entire Image' && searchResult?.success && !lastSearchedKeyword) {
       fetchShoppingLinks(objectLabel);
     }
-  }, [objectLabel, searchResult?.success, fetchShoppingLinks]);
+  }, [objectLabel, searchResult?.success, fetchShoppingLinks, lastSearchedKeyword]);
 
   // Products tab now shows shopping results (with prices) - the most useful for tagging
   const tabs = [
@@ -196,6 +208,72 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             {/* Products Tab - Shows shopping results with prices */}
             {activeTab === 'products' && (
               <div className="space-y-3">
+                {/* Search Input Section */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && fetchShoppingLinks(searchKeyword)}
+                      placeholder="Enter keyword to search..."
+                      className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-gray-200 
+                                placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <button
+                      onClick={() => fetchShoppingLinks(searchKeyword)}
+                      disabled={isLoadingShopping || !searchKeyword.trim()}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-700 disabled:text-gray-500
+                                text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      {isLoadingShopping ? (
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      ) : (
+                        <span>🔍</span>
+                      )}
+                      Search
+                    </button>
+                  </div>
+                  
+                  {/* Suggested Keywords from Visual Search */}
+                  {(() => {
+                    const bestGuess = (searchResult as unknown as { best_guess_labels?: string[] } | null)?.best_guess_labels || [];
+                    const webEntities = searchResult?.web_entities?.slice(0, 5).map(e => e.description) || [];
+                    const suggestions = [...new Set([objectLabel, ...bestGuess, ...webEntities])].filter(Boolean).slice(0, 6);
+                    
+                    if (suggestions.length === 0) return null;
+                    
+                    return (
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-wider mr-1">Try:</span>
+                        {suggestions.map((keyword, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setSearchKeyword(keyword || '');
+                              fetchShoppingLinks(keyword || '');
+                            }}
+                            className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                              keyword === lastSearchedKeyword 
+                                ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50' 
+                                : 'bg-gray-700/50 text-gray-400 hover:bg-emerald-500/20 hover:text-emerald-300 border border-transparent'
+                            }`}
+                          >
+                            {keyword}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  
+                  {lastSearchedKeyword && (
+                    <p className="text-[10px] text-gray-500">
+                      Searched: &quot;<span className="text-emerald-400">{lastSearchedKeyword}</span>&quot;
+                    </p>
+                  )}
+                </div>
+                
+                {/* Loading State */}
                 {isLoadingShopping ? (
                   <div className="flex items-center justify-center py-6">
                     <div className="w-6 h-6 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin"></div>
@@ -331,15 +409,9 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                     )}
                   </>
                 ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <p className="text-sm">No products loaded yet</p>
-                    <p className="text-xs mt-1 text-gray-600">Click &quot;Find Similar&quot; on an object to search</p>
-                    {objectLabel && (
-                      <button onClick={() => fetchShoppingLinks(objectLabel)}
-                        className="mt-3 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors">
-                        🔍 Search for &quot;{objectLabel}&quot;
-                      </button>
-                    )}
+                  <div className="text-center py-4 text-gray-500">
+                    <p className="text-sm">Enter a keyword above to search for products</p>
+                    <p className="text-xs mt-1 text-gray-600">Or click on a suggested keyword</p>
                   </div>
                 )}
               </div>

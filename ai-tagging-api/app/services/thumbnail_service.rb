@@ -4,6 +4,7 @@ require 'mini_magick'
 require 'base64'
 require 'securerandom'
 require 'fileutils'
+require 'open-uri'
 
 # Service to generate thumbnails for detected objects
 # Crops objects from the original image based on bounding boxes
@@ -34,6 +35,37 @@ class ThumbnailService
       objects.map do |obj|
         generate_object_thumbnail(temp_image_path, obj, image_dimensions)
       end
+    ensure
+      # Clean up temp file
+      FileUtils.rm_f(temp_image_path) if temp_image_path && File.exist?(temp_image_path)
+    end
+  end
+
+  # Generate thumbnails from an image URL
+  #
+  # @param image_url [String] URL of the source image
+  # @param objects [Array<Hash>] Array of detected objects with bounding_box
+  # @return [Array<Hash>] Objects with thumbnail_url added
+  def generate_thumbnails_from_url(image_url:, objects:)
+    return objects if objects.blank? || image_url.blank?
+
+    # Download image to temp file
+    temp_image_path = download_image(image_url)
+    return objects unless temp_image_path
+
+    begin
+      # Get image dimensions from downloaded file
+      image = MiniMagick::Image.open(temp_image_path)
+      image_dimensions = { width: image.width, height: image.height }
+      
+      Rails.logger.info("[ThumbnailService] Downloaded image: #{image.width}x#{image.height}")
+
+      objects.map do |obj|
+        generate_object_thumbnail(temp_image_path, obj, image_dimensions)
+      end
+    rescue StandardError => e
+      Rails.logger.error("[ThumbnailService] Error processing image from URL: #{e.message}")
+      objects
     ensure
       # Clean up temp file
       FileUtils.rm_f(temp_image_path) if temp_image_path && File.exist?(temp_image_path)
@@ -149,6 +181,35 @@ class ThumbnailService
       temp_path.to_s
     rescue StandardError => e
       Rails.logger.error("[ThumbnailService] Failed to save temp image: #{e.message}")
+      nil
+    end
+  end
+
+  # Download image from URL to temporary file
+  def download_image(image_url)
+    begin
+      temp_path = Rails.root.join("tmp", "download_#{Time.current.to_i}_#{SecureRandom.hex(4)}.jpg")
+      FileUtils.mkdir_p(File.dirname(temp_path))
+
+      Rails.logger.info("[ThumbnailService] Downloading image from: #{image_url}")
+
+      # Download with timeout and proper headers
+      URI.open(
+        image_url,
+        "User-Agent" => "Mozilla/5.0 (compatible; AITaggingBot/1.0)",
+        read_timeout: 30,
+        open_timeout: 10
+      ) do |remote_file|
+        File.binwrite(temp_path, remote_file.read)
+      end
+
+      Rails.logger.info("[ThumbnailService] Downloaded to: #{temp_path}")
+      temp_path.to_s
+    rescue OpenURI::HTTPError => e
+      Rails.logger.error("[ThumbnailService] HTTP error downloading image: #{e.message}")
+      nil
+    rescue StandardError => e
+      Rails.logger.error("[ThumbnailService] Failed to download image: #{e.message}")
       nil
     end
   end

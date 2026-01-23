@@ -17,7 +17,7 @@ module Ai
       @adapter = adapter_class.new
     end
 
-    # Perform object detection on the given image
+    # Perform object detection on the given image (base64)
     #
     # @param image_base64 [String] Base64-encoded image data
     # @param options [Hash] Detection options
@@ -26,14 +26,17 @@ module Ai
     # @return [Hash] Detection result with success status, objects, and metadata
     def detect(image_base64, options = {})
       result = @adapter.detect(image_base64, options.symbolize_keys)
+      apply_confidence_filter(result, options)
+    end
 
-      # Apply confidence threshold filter if specified
-      if result[:success] && options[:confidence_threshold].present?
-        threshold = options[:confidence_threshold].to_f
-        result[:objects] = filter_by_confidence(result[:objects], threshold)
-      end
-
-      result
+    # Perform object detection on an image from URL
+    #
+    # @param image_url [String] URL to the image
+    # @param options [Hash] Detection options
+    # @return [Hash] Detection result with success status, objects, and metadata
+    def detect_from_url(image_url, options = {})
+      result = @adapter.detect_from_url(image_url, options.symbolize_keys)
+      apply_confidence_filter(result, options)
     end
 
     # Get the name of the current adapter
@@ -42,6 +45,14 @@ module Ai
     end
 
     private
+
+    def apply_confidence_filter(result, options)
+      if result[:success] && options[:confidence_threshold].present?
+        threshold = options[:confidence_threshold].to_f
+        result[:objects] = filter_by_confidence(result[:objects], threshold)
+      end
+      result
+    end
 
     def filter_by_confidence(objects, threshold)
       objects.select { |obj| obj[:confidence] >= threshold }

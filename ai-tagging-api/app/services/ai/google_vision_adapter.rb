@@ -14,9 +14,29 @@ module Ai
       request_id = generate_request_id
 
       result, processing_time_ms = measure_time do
-        perform_detection(image_base64, options)
+        perform_detection({ content: clean_base64(image_base64) }, options)
       end
 
+      build_success_response(result, request_id, processing_time_ms)
+    rescue StandardError => e
+      build_error_response(e, request_id)
+    end
+
+    def detect_from_url(image_url, options = {})
+      request_id = generate_request_id
+
+      result, processing_time_ms = measure_time do
+        perform_detection({ source: { imageUri: image_url } }, options)
+      end
+
+      build_success_response(result, request_id, processing_time_ms)
+    rescue StandardError => e
+      build_error_response(e, request_id)
+    end
+
+    private
+
+    def build_success_response(result, request_id, processing_time_ms)
       {
         success: true,
         request_id: request_id,
@@ -24,9 +44,11 @@ module Ai
         objects: result,
         provider: name
       }
-    rescue StandardError => e
-      Rails.logger.error("[GoogleVisionAdapter] Detection failed: #{e.message}")
-      Rails.logger.error(e.backtrace.first(5).join("\n"))
+    end
+
+    def build_error_response(error, request_id)
+      Rails.logger.error("[GoogleVisionAdapter] Detection failed: #{error.message}")
+      Rails.logger.error(error.backtrace.first(5).join("\n"))
 
       {
         success: false,
@@ -34,21 +56,21 @@ module Ai
         processing_time_ms: 0,
         objects: [],
         provider: name,
-        error: e.message
+        error: error.message
       }
     end
 
-    private
+    def clean_base64(image_base64)
+      # Strip data URL prefix if present (e.g., "data:image/jpeg;base64,")
+      image_base64.sub(%r{^data:image/\w+;base64,}, '')
+    end
 
-    def perform_detection(image_base64, options)
-      response = call_api(image_base64, options)
+    def perform_detection(image_source, options)
+      response = call_api(image_source, options)
       normalize_response(response, options)
     end
 
-    def call_api(image_base64, options)
-      # Strip data URL prefix if present (e.g., "data:image/jpeg;base64,")
-      clean_base64 = image_base64.sub(%r{^data:image/\w+;base64,}, '')
-
+    def call_api(image_source, options)
       conn = Faraday.new(url: API_URL) do |f|
         f.request :json
         f.response :json
@@ -58,7 +80,7 @@ module Ai
 
       response = conn.post do |req|
         req.params['key'] = ENV.fetch('GOOGLE_CLOUD_API_KEY')
-        req.body = build_request_body(clean_base64, options)
+        req.body = build_request_body(image_source, options)
       end
 
       unless response.success?
@@ -69,13 +91,13 @@ module Ai
       response.body
     end
 
-    def build_request_body(image_base64, options)
+    def build_request_body(image_source, options)
       max_results = options[:max_objects] || 10
 
       {
         requests: [
           {
-            image: { content: image_base64 },
+            image: image_source,
             features: [
               { type: 'OBJECT_LOCALIZATION', maxResults: max_results },
               { type: 'LABEL_DETECTION', maxResults: 10 }

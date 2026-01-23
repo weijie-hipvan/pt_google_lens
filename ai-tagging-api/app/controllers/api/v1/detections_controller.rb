@@ -5,18 +5,23 @@ module Api
     # Controller for AI-powered object detection in images.
     # Provides endpoint for detecting objects and their bounding boxes.
     class DetectionsController < ApplicationController
+      # Disable parameter wrapping for JSON requests
+      wrap_parameters false
+
       # POST /api/v1/detections
       #
       # Detect objects in the provided image using AI vision services.
       #
-      # Request body:
+      # Request body (option 1 - base64):
       #   {
       #     "image": "base64_encoded_image_string",
-      #     "options": {
-      #       "max_objects": 10,
-      #       "confidence_threshold": 0.5,
-      #       "provider": "google"
-      #     }
+      #     "options": { "max_objects": 10, "provider": "google" }
+      #   }
+      #
+      # Request body (option 2 - URL):
+      #   {
+      #     "image_url": "https://example.com/image.jpg",
+      #     "provider": "google_vision"
       #   }
       #
       # Response:
@@ -28,27 +33,43 @@ module Api
       #     "provider": "google_vision"
       #   }
       def create
-        image = detection_params[:image]
-        options = detection_params[:options] || {}
-        image_dimensions = detection_params[:image_dimensions]
+        image = params[:image]
+        image_url = params[:image_url]
+        provider = params[:provider] || params.dig(:options, :provider) || 'google_vision'
+        options = params[:options].present? ? params[:options].to_unsafe_h.symbolize_keys : {}
+        image_dimensions = params[:image_dimensions]
 
-        # Validate required parameters
-        if image.blank?
+        # Validate required parameters - need either image or image_url
+        if image.blank? && image_url.blank?
           render json: {
             success: false,
-            error: 'Image is required. Please provide a base64-encoded image.'
+            error: 'Image is required. Please provide either a base64-encoded image or an image_url.'
           }, status: :bad_request
           return
         end
 
         # Perform detection
-        service = Ai::DetectionService.new(provider: options[:provider] || 'google')
-        result = service.detect(image, options.to_h.symbolize_keys)
+        service = Ai::DetectionService.new(provider: provider)
+        
+        # Use URL or base64 depending on what's provided
+        if image_url.present?
+          result = service.detect_from_url(image_url, options)
+        else
+          result = service.detect(image, options)
+        end
 
         if result[:success] && result[:objects].present?
-          # Generate thumbnails for detected objects if image dimensions provided
-          if image_dimensions.present?
-            thumbnail_service = ThumbnailService.new(base_url: request.base_url)
+          # Generate thumbnails for detected objects
+          thumbnail_service = ThumbnailService.new(base_url: request.base_url)
+          
+          if image_url.present?
+            # Generate thumbnails from URL (downloads image, extracts dimensions automatically)
+            result[:objects] = thumbnail_service.generate_thumbnails_from_url(
+              image_url: image_url,
+              objects: result[:objects]
+            )
+          elsif image.present? && image_dimensions.present?
+            # Generate thumbnails from base64 image with provided dimensions
             result[:objects] = thumbnail_service.generate_thumbnails(
               image_data: image,
               objects: result[:objects],
