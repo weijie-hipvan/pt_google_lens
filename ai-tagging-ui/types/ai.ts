@@ -191,6 +191,7 @@ export interface ShoppingSearchResult {
   products: ShoppingProduct[];
   shopping_links?: ShoppingLink[];
   source: string;
+  search_type?: 'image' | 'keyword'; // NEW: indicates whether results came from image or keyword search
   message?: string;
   error?: string;
 }

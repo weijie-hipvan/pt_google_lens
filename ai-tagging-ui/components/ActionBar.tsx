@@ -13,7 +13,7 @@ interface ActionBarProps {
 }
 
 const PROVIDERS: { value: AIProvider; label: string; icon: string; description: string }[] = [
-  { value: 'google', label: 'Google Vision', icon: '🔍', description: 'Best for object detection' },
+  { value: 'google', label: 'Google Vision', icon: '🌐', description: 'Best for object detection' },
   { value: 'openai', label: 'OpenAI GPT-4o', icon: '🤖', description: 'Best for descriptions' },
   { value: 'auto', label: 'Auto (Best)', icon: '✨', description: 'Automatically select' },
 ];
@@ -73,12 +73,12 @@ export default function ActionBar({ onBoost, onExport, selectedProvider, onProvi
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <span>Analyzing...</span>
+                <span>Detecting...</span>
               </>
             ) : (
               <>
-                <span className="text-lg">🚀</span>
-                <span>Boost with AI</span>
+                <span className="text-lg">🔍</span>
+                <span>Detect Objects</span>
               </>
             )}
           </button>

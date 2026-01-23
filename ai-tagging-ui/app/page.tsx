@@ -35,6 +35,7 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchingObjectLabel, setSearchingObjectLabel] = useState<string | undefined>();
   const [searchingObjectId, setSearchingObjectId] = useState<string | undefined>();
+  const [searchingObjectBoundingBox, setSearchingObjectBoundingBox] = useState<{ x: number; y: number; width: number; height: number } | undefined>();
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>('google');
   const [cacheStatus, setCacheStatus] = useState<{ detection: boolean; search: boolean } | null>(null);
   const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
@@ -190,6 +191,7 @@ export default function Home() {
     setIsSearching(true);
     setSearchingObjectLabel(obj.label);
     setSearchingObjectId(objectId); // Track which object we're searching for
+    setSearchingObjectBoundingBox(obj.bounding_box); // Pass bounding box for cropping
     setVisualSearchResult(null);
 
     try {
@@ -408,6 +410,8 @@ export default function Home() {
                 isLoading={isSearching}
                 objectLabel={searchingObjectLabel}
                 objectId={searchingObjectId}
+                originalImageUrl={imageUrl}
+                objectBoundingBox={searchingObjectBoundingBox}
                 onClose={() => setShowProductPanel(false)}
                 onProductsFound={setObjectRelatedProducts}
               />
