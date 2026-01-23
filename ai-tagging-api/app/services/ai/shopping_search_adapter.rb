@@ -121,20 +121,28 @@ module Ai
         end
       end
       
-      # PRIORITY 2: Try SerpApi keyword search
-      if ENV['SERPAPI_KEY'].present?
+      # PRIORITY 2: Try SerpApi keyword search (only if query is present)
+      if query.present? && ENV['SERPAPI_KEY'].present?
         puts "[ShoppingSearch] -> PRIORITY 2: Trying keyword search for '#{query}'..."
         result = search_serpapi(query: query, options: options)
         puts "[ShoppingSearch] -> search_serpapi returned: success=#{result[:success]}, source=#{result[:source]}"
         return result if result[:success]
         puts "[ShoppingSearch] -> search_serpapi failed, falling back..."
+      elsif query.blank?
+        puts "[ShoppingSearch] -> Skipping keyword search (no query provided)"
       else
         puts "[ShoppingSearch] -> SERPAPI_KEY NOT FOUND! Using fallback."
       end
 
-      # PRIORITY 3: Fallback to shopping links
-      puts "[ShoppingSearch] -> PRIORITY 3: Using fallback_search"
-      fallback_search(query: query, options: options)
+      # PRIORITY 3: Fallback to shopping links (only if query is present)
+      if query.present?
+        puts "[ShoppingSearch] -> PRIORITY 3: Using fallback_search"
+        fallback_search(query: query, options: options)
+      else
+        # No query and image search failed - return empty result
+        puts "[ShoppingSearch] -> No query provided and image search failed"
+        { success: false, products: [], shopping_links: [], error: "Image search returned no results and no keyword provided" }
+      end
     end
     
     # Search by image using Google Lens Products API

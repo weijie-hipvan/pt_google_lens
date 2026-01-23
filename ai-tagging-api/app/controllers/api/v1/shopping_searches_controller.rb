@@ -15,14 +15,14 @@ module Api
         
         puts "=" * 60
         puts "[Controller] ShoppingSearchesController#create called!"
-        puts "[Controller] Query: #{query}"
+        puts "[Controller] Query: #{query.presence || '(empty)'}"
         puts "[Controller] Image URL: #{image_url.present? ? image_url.first(80) + '...' : 'nil'}"
         puts "[Controller] Bounding Box: #{bounding_box.present? ? bounding_box : 'nil'}"
         puts "=" * 60
 
-        # Query is required for fallback
-        if query.blank?
-          render json: { success: false, error: "Search query is required" }, status: :bad_request and return
+        # Either query OR image_url is required
+        if query.blank? && image_url.blank?
+          render json: { success: false, error: "Either search query or image_url is required" }, status: :bad_request and return
         end
 
         puts "[Controller] Calling Ai::ShoppingSearchAdapter.search..."
