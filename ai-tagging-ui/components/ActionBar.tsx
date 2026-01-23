@@ -6,10 +6,12 @@ import { useTaggingStore } from '@/store/taggingStore';
 export type AIProvider = 'google' | 'openai' | 'auto';
 
 interface ActionBarProps {
-  onBoost: (provider: AIProvider) => Promise<void>;
+  onBoost: (provider: AIProvider, skipCache?: boolean) => Promise<void>;
   onExport: () => void;
   selectedProvider: AIProvider;
   onProviderChange: (provider: AIProvider) => void;
+  cacheEnabled?: boolean;
+  onCacheToggle?: (enabled: boolean) => void;
 }
 
 const PROVIDERS: { value: AIProvider; label: string; icon: string; description: string }[] = [
@@ -18,7 +20,7 @@ const PROVIDERS: { value: AIProvider; label: string; icon: string; description: 
   { value: 'auto', label: 'Auto (Best)', icon: '✨', description: 'Automatically select' },
 ];
 
-export default function ActionBar({ onBoost, onExport, selectedProvider, onProviderChange }: ActionBarProps) {
+export default function ActionBar({ onBoost, onExport, selectedProvider, onProviderChange, cacheEnabled = true, onCacheToggle }: ActionBarProps) {
   const {
     imageUrl,
     objects,
@@ -56,7 +58,7 @@ export default function ActionBar({ onBoost, onExport, selectedProvider, onProvi
         {/* Boost Button with Provider */}
         <div className="flex items-center" ref={dropdownRef}>
           <button
-            onClick={() => onBoost(selectedProvider)}
+            onClick={() => onBoost(selectedProvider, !cacheEnabled)}
             disabled={!hasImage || isLoading}
             className={`
               px-5 py-2.5 rounded-l-lg font-semibold text-sm
@@ -145,6 +147,34 @@ export default function ActionBar({ onBoost, onExport, selectedProvider, onProvi
             )}
           </div>
         </div>
+
+        {/* Cache Toggle */}
+        <button
+          onClick={() => onCacheToggle?.(!cacheEnabled)}
+          disabled={isLoading}
+          className={`
+            px-2.5 py-2 rounded-lg text-xs font-medium
+            transition-all duration-150 flex items-center gap-1.5
+            ${isLoading ? 'text-gray-600 cursor-not-allowed' : ''}
+            ${cacheEnabled 
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+              : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+            }
+          `}
+          title={cacheEnabled ? 'Cache enabled - click to disable' : 'Cache disabled - always fetch fresh results'}
+        >
+          {cacheEnabled ? (
+            <>
+              <span>⚡</span>
+              <span>Cache ON</span>
+            </>
+          ) : (
+            <>
+              <span>🔄</span>
+              <span>Fresh</span>
+            </>
+          )}
+        </button>
 
         {/* Divider */}
         <div className="w-px h-8 bg-gray-700 mx-1"></div>

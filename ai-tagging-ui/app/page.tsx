@@ -39,6 +39,7 @@ export default function Home() {
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>('google');
   const [cacheStatus, setCacheStatus] = useState<{ detection: boolean; search: boolean } | null>(null);
   const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
+  const [cacheEnabled, setCacheEnabled] = useState(true); // Toggle for cache on/off
 
   // Boost with AI - runs both detection and visual search in parallel
   const handleBoost = async (provider: AIProvider, skipCache: boolean = false) => {
@@ -371,6 +372,8 @@ export default function Home() {
           onExport={handleExport}
           selectedProvider={selectedProvider}
           onProviderChange={setSelectedProvider}
+          cacheEnabled={cacheEnabled}
+          onCacheToggle={setCacheEnabled}
         />
 
         {/* Editor Area - Larger panels for more info */}
@@ -410,7 +413,7 @@ export default function Home() {
                 isLoading={isSearching}
                 objectLabel={searchingObjectLabel}
                 objectId={searchingObjectId}
-                originalImageUrl={imageUrl}
+                originalImageUrl={imageUrl || undefined}
                 objectBoundingBox={searchingObjectBoundingBox}
                 onClose={() => setShowProductPanel(false)}
                 onProductsFound={setObjectRelatedProducts}
