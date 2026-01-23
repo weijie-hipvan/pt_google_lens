@@ -95,18 +95,35 @@ module Ai
       }
     end
 
-    # Main search method - tries SerpApi first, then fallback
-    def self.search(query:, options: {})
+    # Main search method - tries image search first (if image_url provided), then keyword search
+    # @param query [String] Search query (keyword)
+    # @param image_url [String] Optional original image URL for Google Lens (must be PUBLIC)
+    # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object
+    # @param options [Hash] Additional options
+    def self.search(query:, image_url: nil, bounding_box: nil, options: {})
       puts "=" * 60
-      puts "[ShoppingSearch] search() called with query: #{query}"
-      puts "[ShoppingSearch] ENV['SERPAPI_KEY'] present?: #{ENV['SERPAPI_KEY'].present?}"
-      puts "[ShoppingSearch] ENV['SERPAPI_KEY'] value: #{ENV['SERPAPI_KEY']&.first(10)}..." if ENV['SERPAPI_KEY'].present?
-      puts "[ShoppingSearch] All SERP* env vars: #{ENV.keys.select { |k| k.include?('SERP') }}"
+      puts "[ShoppingSearch] search() called"
+      puts "[ShoppingSearch] Query: #{query}"
+      puts "[ShoppingSearch] Image URL: #{image_url.present? ? image_url.first(50) + '...' : 'nil'}"
+      puts "[ShoppingSearch] Bounding Box: #{bounding_box.present? ? bounding_box : 'nil'}"
       puts "=" * 60
       
-      # Try SerpApi first (best results)
+      # PRIORITY 1: Try Google Lens image search if image_url provided
+      if image_url.present? && ENV['SERPAPI_KEY'].present?
+        puts "[ShoppingSearch] -> PRIORITY 1: Trying Google Lens image search..."
+        result = search_by_image(image_url: image_url, bounding_box: bounding_box, options: options)
+        
+        if result[:success] && result[:products].present?
+          puts "[ShoppingSearch] -> Google Lens returned #{result[:products].length} products!"
+          return result
+        else
+          puts "[ShoppingSearch] -> Google Lens returned no products, falling back to keyword search..."
+        end
+      end
+      
+      # PRIORITY 2: Try SerpApi keyword search
       if ENV['SERPAPI_KEY'].present?
-        puts "[ShoppingSearch] -> Calling search_serpapi..."
+        puts "[ShoppingSearch] -> PRIORITY 2: Trying keyword search for '#{query}'..."
         result = search_serpapi(query: query, options: options)
         puts "[ShoppingSearch] -> search_serpapi returned: success=#{result[:success]}, source=#{result[:source]}"
         return result if result[:success]
@@ -115,9 +132,42 @@ module Ai
         puts "[ShoppingSearch] -> SERPAPI_KEY NOT FOUND! Using fallback."
       end
 
-      # Fallback to simulated results based on web detection
-      puts "[ShoppingSearch] -> Using fallback_search"
+      # PRIORITY 3: Fallback to shopping links
+      puts "[ShoppingSearch] -> PRIORITY 3: Using fallback_search"
       fallback_search(query: query, options: options)
+    end
+    
+    # Search by image using Google Lens Products API
+    # Returns visually similar products - more accurate than keyword search
+    # @param image_url [String] Public image URL
+    # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object
+    def self.search_by_image(image_url:, bounding_box: nil, options: {})
+      puts "[ShoppingSearch] -> Calling GoogleLensProductsAdapter.search..."
+      puts "[ShoppingSearch] -> Bounding box: #{bounding_box.present? ? bounding_box : 'full image'}"
+      result = Ai::GoogleLensProductsAdapter.search(
+        image_data: image_url, 
+        bounding_box: bounding_box,
+        options: options
+      )
+      
+      # Normalize response format to match our standard
+      if result[:success]
+        {
+          success: true,
+          request_id: result[:request_id],
+          processing_time_ms: result[:processing_time_ms],
+          query: "image_search",
+          total_results: result[:total_results],
+          products: result[:products],
+          source: result[:source] || 'google_lens_products',
+          search_type: 'image'
+        }
+      else
+        result
+      end
+    rescue StandardError => e
+      puts "[ShoppingSearch] -> Google Lens error: #{e.message}"
+      { success: false, products: [], error: e.message }
     end
 
     private
@@ -149,7 +199,8 @@ module Ai
           query: query,
           total_results: body['search_information']&.dig('total_results') || products.length,
           products: products,
-          source: 'serpapi_google_shopping'
+          source: 'serpapi_google_shopping',
+          search_type: 'keyword'
         }
       else
         {

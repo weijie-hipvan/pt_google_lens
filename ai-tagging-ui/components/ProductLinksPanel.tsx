@@ -9,6 +9,8 @@ interface ProductLinksPanelProps {
   isLoading: boolean;
   objectLabel?: string;
   objectId?: string; // ID of the object being searched
+  originalImageUrl?: string; // Original image URL for Google Lens (must be PUBLIC, not localhost)
+  objectBoundingBox?: { x: number; y: number; width: number; height: number }; // Bounding box for cropping
   onClose: () => void;
   onProductsFound?: (objectId: string, products: RelatedProduct[]) => void; // Callback when products found
 }
@@ -60,7 +62,7 @@ function SimilarImageGrid({ images }: { images: string[] }) {
   );
 }
 
-export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, objectId, onClose, onProductsFound }: ProductLinksPanelProps) {
+export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, objectId, originalImageUrl, objectBoundingBox, onClose, onProductsFound }: ProductLinksPanelProps) {
   const [activeTab, setActiveTab] = useState<'products' | 'similar' | 'tags'>('products');
   const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
   const [isLoadingShopping, setIsLoadingShopping] = useState(false);
@@ -74,13 +76,31 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
     }
   }, [objectLabel]);
 
-  const fetchShoppingLinks = useCallback(async (query: string) => {
+  // Search for products - uses image search (thumbnail URL) with keyword fallback
+  const fetchShoppingLinks = useCallback(async (query: string, useImageSearch: boolean = true) => {
     if (!query.trim()) return;
     setLastSearchedKeyword(query);
     setIsLoadingShopping(true);
     try {
-      const result = await shoppingSearch(query);
+      // Pass original image URL + bounding box for Google Lens search
+      // Backend will crop the image to the specific object before sending to Google Lens
+      const imageUrl = useImageSearch ? originalImageUrl : undefined;
+      
+      // Debug log
+      console.log('[ProductLinksPanel] fetchShoppingLinks called:');
+      console.log('  - query:', query);
+      console.log('  - useImageSearch:', useImageSearch);
+      console.log('  - originalImageUrl:', originalImageUrl ? originalImageUrl.slice(0, 80) + '...' : 'null');
+      console.log('  - objectBoundingBox:', objectBoundingBox);
+      
+      const result = await shoppingSearch(query, { 
+        image_url: imageUrl,
+        bounding_box: useImageSearch ? objectBoundingBox : undefined,
+      });
       setShoppingResult(result);
+      
+      // Log search type for debugging
+      console.log(`[ProductLinksPanel] Search completed - type: ${result.search_type || 'keyword'}, source: ${result.source}`);
       
       // Save products to object if callback provided and objectId exists
       if (result.success && result.products && result.products.length > 0 && objectId && onProductsFound) {
@@ -102,7 +122,7 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
     } finally {
       setIsLoadingShopping(false);
     }
-  }, [objectId, onProductsFound]);
+  }, [objectId, originalImageUrl, objectBoundingBox, onProductsFound]);
 
   // Auto-trigger shopping search when objectLabel changes and we have searchResult
   // Only auto-search if not already searched this session
@@ -141,21 +161,46 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             </svg>
           </button>
         </div>
-        {searchResult && (
-          <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
-            {(searchResult as unknown as { fromCache?: boolean }).fromCache ? (
-              <>
-                <span className="text-emerald-500">⚡</span> 
-                <span className="text-emerald-400">Cached</span>
-              </>
-            ) : (
-              <>
-                <span className="text-yellow-500">⚡</span> 
-                {searchResult.processing_time_ms}ms
-              </>
-            )}
-          </p>
-        )}
+        {/* Search Info */}
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
+          {searchResult && (
+            <p className="text-[10px] text-gray-500 flex items-center gap-1">
+              {(searchResult as unknown as { fromCache?: boolean }).fromCache ? (
+                <>
+                  <span className="text-emerald-500">⚡</span> 
+                  <span className="text-emerald-400">Cached</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-yellow-500">⚡</span> 
+                  {searchResult.processing_time_ms}ms
+                </>
+              )}
+            </p>
+          )}
+          
+          {/* Search Type Indicator */}
+          {shoppingResult && shoppingResult.success && (
+            <div className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 ${
+              shoppingResult.search_type === 'image' 
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+            }`}>
+              {shoppingResult.search_type === 'image' ? (
+                <>
+                  <span>📷</span>
+                  <span>Image Search</span>
+                </>
+              ) : (
+                <>
+                  <span>🔤</span>
+                  <span>Keyword Search</span>
+                </>
+              )}
+              <span className="opacity-60">({shoppingResult.source?.replace('serpapi_', '').replace('_', ' ')})</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Loading State */}

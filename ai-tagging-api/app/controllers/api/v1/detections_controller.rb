@@ -36,8 +36,12 @@ module Api
         image = params[:image]
         image_url = params[:image_url]
         provider = params[:provider] || params.dig(:options, :provider) || 'google_vision'
-        options = params[:options].present? ? params[:options].to_unsafe_h.symbolize_keys : {}
-        image_dimensions = params[:image_dimensions]
+        options = params[:options].present? ? params[:options].permit!.to_h.symbolize_keys : {}
+        
+        # Handle image_dimensions - convert to hash safely
+        image_dimensions = if params[:image_dimensions].present?
+                             params[:image_dimensions].permit(:width, :height).to_h.symbolize_keys
+                           end
 
         # Validate required parameters - need either image or image_url
         if image.blank? && image_url.blank?
@@ -73,7 +77,7 @@ module Api
             result[:objects] = thumbnail_service.generate_thumbnails(
               image_data: image,
               objects: result[:objects],
-              image_dimensions: image_dimensions.to_h.symbolize_keys
+              image_dimensions: image_dimensions
             )
           end
 

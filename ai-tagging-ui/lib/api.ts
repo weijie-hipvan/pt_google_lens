@@ -154,20 +154,33 @@ export async function visualSearch(input: VisualSearchInput, useCache: boolean =
 
 /**
  * Shopping search - find products with prices
- * Results are cached based on query string
+ * Supports both keyword search and image-based search (Google Lens)
+ * Image-based search has priority and returns more accurate results
  * 
- * @param query - Product name or description to search
- * @param options - Search options
+ * @param query - Product name or description to search (fallback if image search fails)
+ * @param options - Search options including optional image_url for visual search
  * @param useCache - Whether to use cached results (default: true)
  * @returns Shopping search result with products and shopping links
  */
 export async function shoppingSearch(
   query: string,
-  options?: { max_results?: number; language?: string; country?: string },
+  options?: { 
+    max_results?: number; 
+    language?: string; 
+    country?: string;
+    image_url?: string;  // Original image URL for Google Lens (must be PUBLIC)
+    bounding_box?: { x: number; y: number; width: number; height: number }; // Crop to specific object
+  },
   useCache: boolean = true
 ): Promise<ShoppingSearchResult & { fromCache?: boolean }> {
-  // For shopping search, we hash the query instead of image
-  const queryHash = generateImageHash(query);
+  // For shopping search, include image_url and bounding_box in cache key if provided
+  const bboxKey = options?.bounding_box 
+    ? `_${options.bounding_box.x.toFixed(2)}_${options.bounding_box.y.toFixed(2)}` 
+    : '';
+  const cacheKeyBase = options?.image_url 
+    ? `${query}_img_${options.image_url.slice(-20)}${bboxKey}` 
+    : query;
+  const queryHash = generateImageHash(cacheKeyBase);
   const cacheKey = 'shopping_search';
   
   // Check cache first
@@ -181,7 +194,13 @@ export async function shoppingSearch(
   try {
     const response = await apiClient.post<ShoppingSearchResult>('/api/v1/shopping_searches', {
       query,
-      options,
+      image_url: options?.image_url,  // Original image URL for Google Lens
+      bounding_box: options?.bounding_box, // Bounding box to crop specific object
+      options: {
+        max_results: options?.max_results,
+        language: options?.language,
+        country: options?.country,
+      },
     });
     const result = response.data;
     
