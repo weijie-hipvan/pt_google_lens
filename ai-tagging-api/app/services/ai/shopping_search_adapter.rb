@@ -1,19 +1,19 @@
-require 'faraday'
-require 'json'
+require "faraday"
+require "json"
 
 module Ai
   class ShoppingSearchAdapter
     # SerpApi for Google Shopping results (recommended for production)
     SERPAPI_URL = "https://serpapi.com/search.json"
-    
+
     # Google Custom Search API (free tier available)
     GOOGLE_CSE_URL = "https://www.googleapis.com/customsearch/v1"
 
     # Search for products using Google Shopping via SerpApi
     # Requires SERPAPI_KEY environment variable
     def self.search_serpapi(query:, options: {})
-      api_key = ENV['SERPAPI_KEY']
-      
+      api_key = ENV["SERPAPI_KEY"]
+
       # Debug logging using puts for immediate output
       puts "=" * 60
       puts "[SerpApi] Starting shopping search"
@@ -21,7 +21,7 @@ module Ai
       puts "[SerpApi] SERPAPI_KEY present: #{api_key.present?}"
       puts "[SerpApi] SERPAPI_KEY length: #{api_key&.length || 0}"
       puts "[SerpApi] SERPAPI_KEY first 8 chars: #{api_key&.first(8)}..." if api_key.present?
-      
+
       unless api_key
         puts "[SerpApi] No SERPAPI_KEY found! Falling back to links."
         return fallback_search(query: query, options: options)
@@ -30,11 +30,11 @@ module Ai
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
       params = {
-        engine: 'google_shopping',
+        engine: "google_shopping",
         q: query,
         api_key: api_key,
-        hl: options[:language] || 'en',
-        gl: options[:country] || 'us',
+        hl: options[:language] || "en",
+        gl: options[:country] || "us",
         num: options[:max_results] || 10
       }
 
@@ -61,9 +61,9 @@ module Ai
 
     # Fallback: Use Google Custom Search API
     def self.search_google_cse(query:, options: {})
-      api_key = ENV['GOOGLE_CLOUD_API_KEY']
-      cx = ENV['GOOGLE_CSE_ID'] # Custom Search Engine ID
-      
+      api_key = ENV["GOOGLE_CLOUD_API_KEY"]
+      cx = ENV["GOOGLE_CSE_ID"] # Custom Search Engine ID
+
       unless api_key && cx
         return {
           success: false,
@@ -78,7 +78,7 @@ module Ai
         key: api_key,
         cx: cx,
         q: "#{query} buy price",
-        searchType: 'image',
+        searchType: "image",
         num: options[:max_results] || 10
       }
 
@@ -107,12 +107,12 @@ module Ai
       puts "[ShoppingSearch] Image URL: #{image_url.present? ? image_url.first(50) + '...' : 'nil'}"
       puts "[ShoppingSearch] Bounding Box: #{bounding_box.present? ? bounding_box : 'nil'}"
       puts "=" * 60
-      
+
       # PRIORITY 1: Try Google Lens image search if image_url provided
-      if image_url.present? && ENV['SERPAPI_KEY'].present?
+      if image_url.present? && ENV["SERPAPI_KEY"].present?
         puts "[ShoppingSearch] -> PRIORITY 1: Trying Google Lens image search..."
         result = search_by_image(image_url: image_url, bounding_box: bounding_box, options: options)
-        
+
         if result[:success] && result[:products].present?
           puts "[ShoppingSearch] -> Google Lens returned #{result[:products].length} products!"
           return result
@@ -144,7 +144,7 @@ module Ai
         { success: false, products: [], shopping_links: [], error: "Image search returned no results and no keyword provided" }
       end
     end
-    
+
     # Search by image using Google Lens Products API
     # Returns visually similar products - more accurate than keyword search
     # @param image_url [String] Public image URL
@@ -153,11 +153,11 @@ module Ai
       puts "[ShoppingSearch] -> Calling GoogleLensProductsAdapter.search..."
       puts "[ShoppingSearch] -> Bounding box: #{bounding_box.present? ? bounding_box : 'full image'}"
       result = Ai::GoogleLensProductsAdapter.search(
-        image_data: image_url, 
+        image_url: image_url,
         bounding_box: bounding_box,
         options: options
       )
-      
+
       # Normalize response format to match our standard
       if result[:success]
         {
@@ -167,8 +167,8 @@ module Ai
           query: "image_search",
           total_results: result[:total_results],
           products: result[:products],
-          source: result[:source] || 'google_lens_products',
-          search_type: 'image'
+          source: result[:source] || "google_lens_products",
+          search_type: "image"
         }
       else
         result
@@ -183,20 +183,20 @@ module Ai
     def self.handle_serpapi_response(response, processing_time_ms, query)
       if response.success?
         body = JSON.parse(response.body)
-        
-        products = (body['shopping_results'] || []).map do |item|
+
+        products = (body["shopping_results"] || []).map do |item|
           {
-            title: item['title'],
-            url: item['link'],
-            price: item['price'],
-            extracted_price: item['extracted_price'],
-            currency: detect_currency(item['price']),
-            image_url: item['thumbnail'],
-            merchant: item['source'],
-            rating: item['rating'],
-            reviews_count: item['reviews'],
-            shipping: item['delivery'],
-            condition: item['second_hand_condition']
+            title: item["title"],
+            url: item["link"],
+            price: item["price"],
+            extracted_price: item["extracted_price"],
+            currency: detect_currency(item["price"]),
+            image_url: item["thumbnail"],
+            merchant: item["source"],
+            rating: item["rating"],
+            reviews_count: item["reviews"],
+            shipping: item["delivery"],
+            condition: item["second_hand_condition"]
           }
         end
 
@@ -205,10 +205,10 @@ module Ai
           request_id: SecureRandom.uuid,
           processing_time_ms: processing_time_ms,
           query: query,
-          total_results: body['search_information']&.dig('total_results') || products.length,
+          total_results: body["search_information"]&.dig("total_results") || products.length,
           products: products,
-          source: 'serpapi_google_shopping',
-          search_type: 'keyword'
+          source: "serpapi_google_shopping",
+          search_type: "keyword"
         }
       else
         {
@@ -224,14 +224,14 @@ module Ai
     def self.handle_google_cse_response(response, processing_time_ms, query)
       if response.success?
         body = JSON.parse(response.body)
-        
-        products = (body['items'] || []).map do |item|
+
+        products = (body["items"] || []).map do |item|
           {
-            title: item['title'],
-            url: item['link'],
-            image_url: item['image']&.dig('thumbnailLink'),
-            merchant: extract_domain(item['displayLink']),
-            snippet: item['snippet']
+            title: item["title"],
+            url: item["link"],
+            image_url: item["image"]&.dig("thumbnailLink"),
+            merchant: extract_domain(item["displayLink"]),
+            snippet: item["snippet"]
           }
         end
 
@@ -241,7 +241,7 @@ module Ai
           processing_time_ms: processing_time_ms,
           query: query,
           products: products,
-          source: 'google_cse'
+          source: "google_cse"
         }
       else
         {
@@ -255,7 +255,7 @@ module Ai
     # Fallback search using known e-commerce URLs
     def self.fallback_search(query:, options: {})
       encoded_query = ERB::Util.url_encode(query)
-      
+
       # Generate shopping links for major retailers
       shopping_links = [
         {
@@ -315,25 +315,25 @@ module Ai
         query: query,
         products: [],
         shopping_links: shopping_links,
-        source: 'fallback_links',
+        source: "fallback_links",
         message: "Direct product search not available. Use the shopping links below to search."
       }
     end
 
     def self.detect_currency(price_string)
       return nil unless price_string
-      
+
       case price_string
       when /\$/
-        'USD'
+        "USD"
       when /€/
-        'EUR'
+        "EUR"
       when /£/
-        'GBP'
+        "GBP"
       when /¥/
-        'JPY'
+        "JPY"
       when /S\$/
-        'SGD'
+        "SGD"
       else
         nil
       end
@@ -341,7 +341,7 @@ module Ai
 
     def self.extract_domain(url)
       return nil unless url
-      url.gsub('www.', '').split('.').first.capitalize
+      url.gsub("www.", "").split(".").first.capitalize
     rescue
       nil
     end

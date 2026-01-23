@@ -3,15 +3,18 @@ module Api
     class GoogleLensProductsController < ApplicationController
       # POST /api/v1/google_lens_products
       # Search for products using Google Lens (image-based product search)
+      # @param image_url [String] Public image URL (required)
+      # @param bounding_box [Hash] Optional {x, y, width, height} normalized (0-1) to crop specific object
       def create
-        image_data = params[:image]
+        image_url = params[:image_url] || params[:image] # Support both for backward compatibility
+        bounding_box = params[:bounding_box].present? ? params[:bounding_box].permit(:x, :y, :width, :height).to_h.symbolize_keys : nil
         options = google_lens_products_options_params.to_h.symbolize_keys
 
-        if image_data.blank?
-          render json: { success: false, error: "Image data is required" }, status: :bad_request and return
+        if image_url.blank?
+          render json: { success: false, error: "Image URL is required" }, status: :bad_request and return
         end
 
-        result = Ai::GoogleLensProductsAdapter.search(image_data: image_data, options: options)
+        result = Ai::GoogleLensProductsAdapter.search(image_url: image_url, bounding_box: bounding_box, options: options)
 
         if result[:success]
           render json: result, status: :ok
@@ -31,7 +34,7 @@ module Api
       private
 
       def google_lens_products_options_params
-        params.fetch(:options, {}).permit(:max_results, :language, :country)
+        params.fetch(:options, {}).permit(:max_results, :language)
       end
     end
   end
