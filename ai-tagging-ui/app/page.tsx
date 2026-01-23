@@ -39,7 +39,7 @@ export default function Home() {
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>('google');
   const [cacheStatus, setCacheStatus] = useState<{ detection: boolean; search: boolean } | null>(null);
   const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
-  const [cacheEnabled, setCacheEnabled] = useState(true); // Toggle for cache on/off
+  const [cacheEnabled, setCacheEnabled] = useState(false); // Default: OFF - always fetch fresh, click to enable cache
 
   // Boost with AI - runs both detection and visual search in parallel
   const handleBoost = async (provider: AIProvider, skipCache: boolean = false) => {
