@@ -13,6 +13,10 @@ Rails.application.routes.draw do
       # Shopping/price search endpoint
       # POST /api/v1/shopping_searches
       resources :shopping_searches, only: [:create]
+
+      # Google Lens Products endpoint (image-based product search)
+      # POST /api/v1/google_lens_products
+      resources :google_lens_products, only: [:create]
     end
   end
 
