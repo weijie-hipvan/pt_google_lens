@@ -1,5 +1,14 @@
-# 🚀 AI Tagging Boost Tool - Implementation Plan
-## For AI Agent Implementation Assistance
+# 🚀 AI Tagging Boost Tool - Implementation Plan (Phase 1)
+## Original Design Document
+
+> ⚠️ **Note:** This is the original Phase 1 implementation plan from the hackathon.
+> The project has since evolved with additional features including:
+> - SerpApi integration (Google Lens + Google Shopping)
+> - Communa-Web integration
+> - Imgix server-side cropping
+> - Thumbnail generation service
+>
+> See [README.md](./README.md) for current architecture and [QUICK_START.md](./QUICK_START.md) for setup instructions.
 
 ---
 

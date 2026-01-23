@@ -120,6 +120,7 @@ export async function shoppingSearch(
     country?: string;
     image_url?: string;  // Original image URL for Google Lens (must be PUBLIC)
     bounding_box?: { x: number; y: number; width: number; height: number }; // Crop to specific object
+    image_dimensions?: { width: number; height: number }; // Actual image dimensions for accurate crop
   }
 ): Promise<ShoppingSearchResult> {
   try {
@@ -127,6 +128,7 @@ export async function shoppingSearch(
       query,
       image_url: options?.image_url,  // Original image URL for Google Lens
       bounding_box: options?.bounding_box, // Bounding box to crop specific object
+      image_dimensions: options?.image_dimensions, // Actual image dimensions for accurate crop calculation
       options: {
         max_results: options?.max_results,
         language: options?.language,

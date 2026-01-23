@@ -11,6 +11,7 @@ interface ProductLinksPanelProps {
   objectId?: string; // ID of the object being searched
   originalImageUrl?: string; // Original image URL for Google Lens (must be PUBLIC, not localhost)
   objectBoundingBox?: { x: number; y: number; width: number; height: number }; // Bounding box for cropping
+  imageDimensions?: { width: number; height: number }; // Actual image dimensions for accurate crop calculation
   onClose: () => void;
   onProductsFound?: (objectId: string, products: RelatedProduct[]) => void; // Callback when products found
 }
@@ -159,7 +160,7 @@ function SimilarImageGrid({ images }: { images: string[] }) {
   );
 }
 
-export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, objectId, originalImageUrl, objectBoundingBox, onClose, onProductsFound }: ProductLinksPanelProps) {
+export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, objectId, originalImageUrl, objectBoundingBox, imageDimensions, onClose, onProductsFound }: ProductLinksPanelProps) {
   const [activeTab, setActiveTab] = useState<'products' | 'similar' | 'tags'>('products');
   
   // Separate state for image search and keyword search results
@@ -213,10 +214,12 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
       console.log('[ProductLinksPanel] Starting IMAGE search...');
       console.log('  - originalImageUrl:', originalImageUrl.slice(0, 80) + '...');
       console.log('  - objectBoundingBox:', objectBoundingBox);
+      console.log('  - imageDimensions:', imageDimensions);
       
       const result = await shoppingSearch('', { 
         image_url: originalImageUrl,
         bounding_box: objectBoundingBox,
+        image_dimensions: imageDimensions,
       });
       
       // Only set if it was actually an image search
@@ -249,7 +252,7 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
     } finally {
       setIsLoadingImageSearch(false);
     }
-  }, [originalImageUrl, objectBoundingBox, objectId, onProductsFound]);
+  }, [originalImageUrl, objectBoundingBox, imageDimensions, objectId, onProductsFound]);
 
   // Keyword-based search using Google Shopping
   const fetchKeywordSearch = useCallback(async (query: string) => {

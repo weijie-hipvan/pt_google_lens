@@ -330,6 +330,7 @@ export default function Home() {
                 objectId={searchingObjectId}
                 originalImageUrl={imageUrl || undefined}
                 objectBoundingBox={searchingObjectBoundingBox}
+                imageDimensions={imageDimensions ? { width: imageDimensions.naturalWidth, height: imageDimensions.naturalHeight } : undefined}
                 onClose={() => setShowProductPanel(false)}
                 onProductsFound={setObjectRelatedProducts}
               />

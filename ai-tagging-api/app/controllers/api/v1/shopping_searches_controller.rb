@@ -6,11 +6,13 @@ module Api
       # Supports both keyword search and image-based search
       # @param query [String] Search keyword (required)
       # @param image_url [String] Original image URL for Google Lens (public URL)
-      # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object
+      # @param bounding_box [Hash] Optional {x, y, width, height} to crop specific object (normalized 0-1)
+      # @param image_dimensions [Hash] Optional {width, height} actual image dimensions for accurate crop calculation
       def create
         query = params[:query]
         image_url = params[:image_url]  # Original image URL for Google Lens (must be PUBLIC)
         bounding_box = params[:bounding_box].present? ? params[:bounding_box].permit(:x, :y, :width, :height).to_h.symbolize_keys : nil
+        image_dimensions = params[:image_dimensions].present? ? params[:image_dimensions].permit(:width, :height).to_h.symbolize_keys : nil
         options = shopping_options_params.to_h.symbolize_keys
         
         puts "=" * 60
@@ -18,6 +20,7 @@ module Api
         puts "[Controller] Query: #{query.presence || '(empty)'}"
         puts "[Controller] Image URL: #{image_url.present? ? image_url.first(80) + '...' : 'nil'}"
         puts "[Controller] Bounding Box: #{bounding_box.present? ? bounding_box : 'nil'}"
+        puts "[Controller] Image Dimensions: #{image_dimensions.present? ? image_dimensions : 'nil (will estimate)'}"
         puts "=" * 60
 
         # Either query OR image_url is required
@@ -28,8 +31,9 @@ module Api
         puts "[Controller] Calling Ai::ShoppingSearchAdapter.search..."
         result = Ai::ShoppingSearchAdapter.search(
           query: query,
-          image_url: image_url,       # Pass original image URL (must be public)
-          bounding_box: bounding_box, # Pass bounding box for cropping
+          image_url: image_url,               # Pass original image URL (must be public)
+          bounding_box: bounding_box,         # Pass bounding box for cropping (normalized 0-1)
+          image_dimensions: image_dimensions, # Pass actual image dimensions for accurate crop
           options: options
         )
         puts "[Controller] Result success: #{result[:success]}, source: #{result[:source]}, search_type: #{result[:search_type]}"

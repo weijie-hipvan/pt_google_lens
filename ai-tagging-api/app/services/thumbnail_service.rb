@@ -45,13 +45,15 @@ class ThumbnailService
   #
   # @param image_url [String] URL of the source image
   # @param objects [Array<Hash>] Array of detected objects with bounding_box
-  # @return [Array<Hash>] Objects with thumbnail_url added
+  # @return [Hash] { objects: Array<Hash>, image_dimensions: Hash } - Objects with thumbnail_url and image dimensions
   def generate_thumbnails_from_url(image_url:, objects:)
-    return objects if objects.blank? || image_url.blank?
+    if objects.blank? || image_url.blank?
+      return { objects: objects, image_dimensions: nil }
+    end
 
     # Download image to temp file
     temp_image_path = download_image(image_url)
-    return objects unless temp_image_path
+    return { objects: objects, image_dimensions: nil } unless temp_image_path
 
     begin
       # Get image dimensions from downloaded file
@@ -60,12 +62,14 @@ class ThumbnailService
       
       Rails.logger.info("[ThumbnailService] Downloaded image: #{image.width}x#{image.height}")
 
-      objects.map do |obj|
+      processed_objects = objects.map do |obj|
         generate_object_thumbnail(temp_image_path, obj, image_dimensions)
       end
+
+      { objects: processed_objects, image_dimensions: image_dimensions }
     rescue StandardError => e
       Rails.logger.error("[ThumbnailService] Error processing image from URL: #{e.message}")
-      objects
+      { objects: objects, image_dimensions: nil }
     ensure
       # Clean up temp file
       FileUtils.rm_f(temp_image_path) if temp_image_path && File.exist?(temp_image_path)

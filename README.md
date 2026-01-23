@@ -1,8 +1,8 @@
-# 🏷️ AI Tagging Boost Tool
+# 🏷️ AI Tagging Boost System
 
-> **"Same workflow, OPTIONAL AI superpower"**
+> **AI-powered product tagging for interior design images**
 
-An optional AI-powered tool that helps tagging teams work faster - not mandatory, no workflow changes required.
+An AI system that detects objects in images and finds matching products for quick tagging in content management workflows.
 
 ---
 
@@ -10,60 +10,98 @@ An optional AI-powered tool that helps tagging teams work faster - not mandatory
 
 | File | Description |
 |------|-------------|
-| [📋 IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) | Detailed technical spec, architecture, code samples |
-| [🤖 AI_AGENT_PROMPTS.md](./AI_AGENT_PROMPTS.md) | Prompt templates to guide AI agent implementation |
-| [⚡ QUICK_START.md](./QUICK_START.md) | Quick start guide with checklist |
-
----
-
-## 🎯 Project Overview
-
-### What This Is
-- ✅ **Optional** tool - team chooses when to use it
-- ✅ **Enhancement** add-on - boost productivity
-- ✅ **AI trend** adoption - stay competitive
-- ✅ **Zero disruption** - existing workflow remains 100% intact
-
-### What This Is NOT
-- ❌ Replacement for current workflow
-- ❌ Mandatory system
-- ❌ Process change
+| [📋 IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) | Original technical spec (Phase 1) |
+| [🤖 AI_AGENT_PROMPTS.md](./AI_AGENT_PROMPTS.md) | Prompt templates for AI agent |
+| [⚡ QUICK_START.md](./QUICK_START.md) | Quick start guide |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────┐     ┌──────────────────────┐
-│   FRONTEND           │     │   BACKEND            │
-│   Next.js + React    │────▶│   Rails API          │
-│   TypeScript         │     │   Ruby               │
-│   Tailwind CSS       │     │   Google Vision      │
-│   React Konva        │     │                      │
-└──────────────────────┘     └──────────────────────┘
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         AI TAGGING SYSTEM                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌──────────────────┐         ┌──────────────────┐
+    │   COMMUNA-WEB    │         │  AI-TAGGING-UI   │
+    │  (Main Product)  │         │ (Standalone Tool)│
+    │                  │         │                  │
+    │  React Router 7  │         │   Next.js 14     │
+    │  TypeScript      │         │   TypeScript     │
+    │  Vanilla Extract │         │   Tailwind CSS   │
+    └────────┬─────────┘         └────────┬─────────┘
+             │                            │
+             │     HTTP/REST API          │
+             └────────────┬───────────────┘
+                          │
+                          ▼
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                        AI-TAGGING-API                                    │
+    │                        (Rails 8 Backend)                                 │
+    │                                                                          │
+    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+    │  │ Detections  │  │  Shopping   │  │   Visual    │  │ GoogleLens  │     │
+    │  │ Controller  │  │  Searches   │  │  Searches   │  │  Products   │     │
+    │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘     │
+    │         │                │                │                │            │
+    │         ▼                ▼                ▼                ▼            │
+    │  ┌─────────────────────────────────────────────────────────────────┐    │
+    │  │                        SERVICES LAYER                           │    │
+    │  │                                                                 │    │
+    │  │  • DetectionService      - Object detection orchestration       │    │
+    │  │  • GoogleVisionAdapter   - Google Cloud Vision API              │    │
+    │  │  • GoogleLensProductsAdapter - SerpApi Google Lens (Products)   │    │
+    │  │  • ShoppingSearchAdapter - SerpApi Google Shopping              │    │
+    │  │  • ThumbnailService      - Image cropping (MiniMagick)          │    │
+    │  └─────────────────────────────────────────────────────────────────┘    │
+    └─────────────────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                        EXTERNAL SERVICES                                 │
+    │                                                                          │
+    │   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐     │
+    │   │  Google Cloud   │    │    SerpApi      │    │     Imgix       │     │
+    │   │  Vision API     │    │                 │    │  (Image CDN)    │     │
+    │   │                 │    │  • Google Lens  │    │                 │     │
+    │   │  • Object       │    │  • Google       │    │  • Server-side  │     │
+    │   │    Detection    │    │    Shopping     │    │    cropping     │     │
+    │   │  • Labeling     │    │                 │    │  • rect param   │     │
+    │   └─────────────────┘    └─────────────────┘    └─────────────────┘     │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Backend (Rails API)
-| Component | Technology |
-|-----------|------------|
-| Framework | Ruby on Rails 7 (API mode) |
-| Language | Ruby 3.2+ |
-| HTTP Client | Faraday |
-| AI Provider | Google Cloud Vision API |
+### Backend (ai-tagging-api/)
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Framework | Ruby on Rails | 8.0 (API mode) |
+| Language | Ruby | 3.3.4 |
+| HTTP Client | Faraday | 2.x |
+| Image Processing | MiniMagick | - |
+| AI Provider | Google Cloud Vision API | v1 |
+| Product Search | SerpApi (Google Lens + Shopping) | - |
 
-### Frontend (Next.js)
-| Component | Technology |
-|-----------|------------|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS |
-| Canvas | React Konva |
-| State | Zustand |
-| HTTP Client | Axios |
+### Frontend - Standalone (ai-tagging-ui/)
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Framework | Next.js | 14+ (App Router) |
+| Language | TypeScript | 5.x |
+| Styling | Tailwind CSS | 3.x |
+| Canvas | React Konva | 18.x |
+| State | Zustand | 4.x |
+
+### Integration - Communa Web
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Framework | React Router | 7.x |
+| Language | TypeScript | 5.x |
+| Styling | Vanilla Extract | - |
+| State | Zustand | 4.x |
 
 ---
 
@@ -72,122 +110,103 @@ An optional AI-powered tool that helps tagging teams work faster - not mandatory
 ```
 /ai-tagging-api (Rails Backend)
 ├── app/
-│   ├── controllers/api/v1/detections_controller.rb
+│   ├── controllers/api/v1/
+│   │   ├── detections_controller.rb
+│   │   ├── shopping_searches_controller.rb
+│   │   ├── visual_searches_controller.rb
+│   │   └── google_lens_products_controller.rb
 │   └── services/ai/
-│       ├── base_adapter.rb
+│       ├── detection_service.rb
 │       ├── google_vision_adapter.rb
-│       └── detection_service.rb
+│       ├── google_lens_products_adapter.rb
+│       └── shopping_search_adapter.rb
 ├── config/
-│   ├── routes.rb
-│   └── initializers/cors.rb
+│   └── routes.rb
 └── .env
 
-/ai-tagging-ui (Next.js Frontend)
+/ai-tagging-ui (Next.js Standalone)
 ├── app/
 │   ├── page.tsx
-│   ├── layout.tsx
-│   └── globals.css
+│   └── layout.tsx
 ├── components/
 │   ├── ImageUploader.tsx
 │   ├── CanvasViewer.tsx
 │   ├── ObjectList.tsx
 │   ├── ActionBar.tsx
-│   ├── ConfidenceBadge.tsx
+│   ├── ProductLinksPanel.tsx
 │   └── ExportModal.tsx
 ├── lib/api.ts
 ├── store/taggingStore.ts
-├── types/ai.ts
-└── .env.local
+└── types/ai.ts
+
+/communa-web (Integration)
+├── app/
+│   ├── components/
+│   │   ├── AITaggingImporter/
+│   │   │   ├── index.tsx
+│   │   │   ├── ObjectSelector.tsx
+│   │   │   ├── ImportPreview.tsx
+│   │   │   └── styles.css.ts
+│   │   └── SortableEntries.client/
+│   │       └── PictureList/
+│   │           └── PostImage.tsx
+│   └── utils/aiTaggingImporter/
+│       ├── api.ts
+│       ├── types.ts
+│       └── converter.ts
 ```
 
 ---
 
 ## 🚀 Quick Start
 
+### Prerequisites
+- Ruby 3.3+
+- Node.js 18+
+- Google Cloud Vision API key
+- SerpApi API key
+
 ### Backend Setup
 ```bash
-# Create Rails API
-rails new ai-tagging-api --api
 cd ai-tagging-api
+bundle install
 
-# Add gems
-bundle add rack-cors faraday dotenv-rails
-
-# Configure .env
-echo "GOOGLE_CLOUD_API_KEY=your_key" > .env
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys
 
 # Start server
 rails s -p 3001
 ```
 
-### Frontend Setup
+### Frontend Setup (Standalone Tool)
 ```bash
-# Create Next.js project
-npx create-next-app@latest ai-tagging-ui --typescript --tailwind --app
 cd ai-tagging-ui
-
-# Install dependencies
-npm install konva react-konva zustand uuid axios
-
-# Configure .env.local
-echo "NEXT_PUBLIC_API_URL=http://localhost:3001" > .env.local
-
-# Start dev server
+npm install
 npm run dev
+# Open http://localhost:3000
 ```
 
-### Open Browser
-```
-http://localhost:3000
+### Communa-Web Integration
+```bash
+cd communa-web
+pnpm install
+pnpm dev
+# Open http://localhost:3000
 ```
 
 ---
 
-## 📖 Implementation Guide
-
-**See detailed implementation in:**
-- [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) - Full technical spec
-- [AI_AGENT_PROMPTS.md](./AI_AGENT_PROMPTS.md) - Step-by-step prompts
-
-**Timeline: 24-hour Hackathon**
-
-| Phase | Hours | Focus |
-|-------|-------|-------|
-| Foundation | 1-6 | Rails API + Next.js Setup |
-| Core UI | 7-14 | Canvas + Components |
-| Integration | 15-20 | Connect + Polish |
-| Demo | 21-24 | Deploy + Rehearse |
-
----
-
-## 🎬 Demo Flow
-
-```
-Upload Image → Click "Boost with AI" → See Bounding Boxes
-→ Accept/Reject Objects → Export JSON
-```
-
-**Key Features:**
-- 🖼️ Drag & drop image upload
-- 🤖 AI object detection with bounding boxes
-- 🎨 Color-coded confidence (🟢🟡🔴)
-- ✅❌ Accept/Reject individual objects
-- 📥 Export JSON results
-
----
-
-## 📝 API
+## 📝 API Endpoints
 
 ### POST /api/v1/detections
+Detect objects in an image.
 
 **Request:**
 ```json
 {
-  "image": "base64_encoded_string",
-  "options": {
-    "max_objects": 10,
-    "confidence_threshold": 0.7
-  }
+  "image_url": "https://example.imgix.net/image.jpg",
+  "provider": "google_vision"
 }
 ```
 
@@ -203,10 +222,46 @@ Upload Image → Click "Boost with AI" → See Bounding Boxes
       "label": "sofa",
       "confidence": 0.95,
       "bounding_box": { "x": 0.1, "y": 0.15, "width": 0.3, "height": 0.2 },
-      "status": "pending"
+      "thumbnail_url": "http://localhost:3001/thumbnails/..."
     }
   ],
+  "image_dimensions": { "width": 5504, "height": 8256 },
   "provider": "google_vision"
+}
+```
+
+### POST /api/v1/shopping_searches
+Search for products matching an object.
+
+**Request:**
+```json
+{
+  "query": "SMEG coffee machine",
+  "image_url": "https://example.imgix.net/image.jpg",
+  "bounding_box": { "x": 0.48, "y": 0.53, "width": 0.10, "height": 0.11 },
+  "image_dimensions": { "width": 5504, "height": 8256 }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "products": [
+    {
+      "title": "SMEG Drip Filter Coffee Machine",
+      "price": "$389.00",
+      "extracted_price": 389,
+      "merchant": "west elm",
+      "url": "https://...",
+      "image_url": "https://...",
+      "rating": 4.6,
+      "reviews_count": 4300,
+      "shipping": "Free shipping"
+    }
+  ],
+  "source": "serpapi_google_lens_products",
+  "search_type": "image"
 }
 ```
 
@@ -217,6 +272,7 @@ Upload Image → Click "Boost with AI" → See Bounding Boxes
 ### Backend (.env)
 ```env
 GOOGLE_CLOUD_API_KEY=your_google_cloud_api_key
+SERPAPI_KEY=your_serpapi_key
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -227,10 +283,50 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 
 ---
 
+## ✨ Key Features
+
+- ✅ **Object Detection** - AI-powered detection using Google Cloud Vision
+- ✅ **Visual Product Search** - Find products via Google Lens image search
+- ✅ **Accurate Cropping** - Imgix server-side crop with exact dimensions
+- ✅ **Keyword Fallback** - Google Shopping search when image search fails
+- ✅ **Communa Integration** - Direct import to PostSubmission form
+- ✅ **Thumbnail Generation** - Visual preview of detected objects
+- ✅ **Multi-product Selection** - Choose from multiple product matches
+
+---
+
+## 📊 Data Flow
+
+```
+1. USER UPLOADS IMAGE
+   │
+   ▼
+2. OBJECT DETECTION (Google Vision)
+   ├── Detect objects in image
+   ├── Return bounding boxes (normalized 0-1)
+   ├── Extract image dimensions (MiniMagick)
+   └── Generate thumbnails for each object
+   │
+   ▼
+3. PRODUCT SEARCH (SerpApi Google Lens)
+   ├── Receive: image_url + bounding_box + image_dimensions
+   ├── Calculate: imgix crop rect (pixel coordinates)
+   ├── Request: Cropped image → Google Lens
+   └── Return: Related products with prices/merchants
+   │
+   ▼
+4. IMPORT TO POST (Communa-Web)
+   ├── User selects products
+   ├── Convert to ShoppingPin format
+   └── Add to post with coordinates
+```
+
+---
+
 ## 📄 License
 
 MIT
 
 ---
 
-**Hackathon Project - January 2025**
+**Last Updated:** January 2026

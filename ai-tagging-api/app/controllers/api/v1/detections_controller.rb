@@ -68,10 +68,12 @@ module Api
           
           if image_url.present?
             # Generate thumbnails from URL (downloads image, extracts dimensions automatically)
-            result[:objects] = thumbnail_service.generate_thumbnails_from_url(
+            thumbnail_result = thumbnail_service.generate_thumbnails_from_url(
               image_url: image_url,
               objects: result[:objects]
             )
+            result[:objects] = thumbnail_result[:objects]
+            result[:image_dimensions] = thumbnail_result[:image_dimensions]
           elsif image.present? && image_dimensions.present?
             # Generate thumbnails from base64 image with provided dimensions
             result[:objects] = thumbnail_service.generate_thumbnails(
@@ -79,6 +81,7 @@ module Api
               objects: result[:objects],
               image_dimensions: image_dimensions
             )
+            result[:image_dimensions] = image_dimensions
           end
 
           render json: result, status: :ok
