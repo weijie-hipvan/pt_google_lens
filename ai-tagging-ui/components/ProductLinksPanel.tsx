@@ -185,9 +185,26 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
   }, [objectId, objectLabel]);
 
   // Image-based search using Google Lens (cropped object image)
+  // Note: Only works with PUBLIC URLs (imgix, etc). Blob URLs from file uploads won't work.
   const fetchImageSearch = useCallback(async () => {
     if (!originalImageUrl || !objectBoundingBox) {
       console.log('[ProductLinksPanel] Skipping image search - no URL or bounding box');
+      return;
+    }
+    
+    // Skip if it's a blob URL (from file upload) - Google Lens can't access these
+    if (originalImageUrl.startsWith('blob:')) {
+      console.log('[ProductLinksPanel] Skipping image search - blob URL not accessible by Google Lens');
+      setImageSearchResult({
+        success: false,
+        products: [],
+        error: 'Image search requires a public URL. Enter an image URL (e.g., imgix) to enable image search.',
+        search_type: 'image',
+        request_id: '',
+        processing_time_ms: 0,
+        query: '',
+        source: 'skipped',
+      });
       return;
     }
     

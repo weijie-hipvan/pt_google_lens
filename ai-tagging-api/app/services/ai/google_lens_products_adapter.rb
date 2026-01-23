@@ -32,6 +32,13 @@ module Ai
         num: options[:max_results] || 10
       }
 
+      # Check if it's a blob URL (from file upload) - not accessible by SerpApi
+      if image_data.start_with?("blob:")
+        puts "[GoogleLens] ⚠️ Blob URL detected: #{image_data}"
+        puts "[GoogleLens] -> Skipping image search (blob URLs are not public)"
+        return { success: false, products: [], error: "Blob URL not accessible - use imgix URL or enter image URL directly" }
+      end
+      
       # Check if it's a URL (starts with http:// or https://)
       if image_data.match?(/^https?:\/\//)
         # IMPORTANT: SerpApi needs a PUBLICLY accessible URL
