@@ -52,6 +52,7 @@ module Ai
         api_key: api_key,
         hl: options[:language] || "en",
         gl: "sg", # Default to Singapore
+        country: "sg",
         num: options[:max_results] || 10
       }
 
