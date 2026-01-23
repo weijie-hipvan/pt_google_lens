@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getHistory, removeFromHistory, clearHistory, HistoryEntry, getCacheStats } from '@/lib/cache';
+import { getHistory, removeFromHistory, clearHistory, HistoryEntry } from '@/lib/cache';
 
 interface HistoryPanelProps {
-  onLoadHistory: (imageHash: string) => void;
-  currentImageHash?: string;
+  onLoadHistory: () => void;
   onClose: () => void;
 }
 
@@ -20,29 +19,18 @@ function formatTimeAgo(timestamp: number): string {
 
 function HistoryCard({ 
   entry, 
-  isActive,
-  onLoad, 
   onDelete 
 }: { 
   entry: HistoryEntry; 
-  isActive: boolean;
-  onLoad: () => void; 
   onDelete: () => void;
 }) {
   return (
     <div 
-      className={`
-        group relative p-3 rounded-lg border transition-all cursor-pointer
-        ${isActive 
-          ? 'bg-emerald-500/20 border-emerald-500/50' 
-          : 'bg-gray-800/50 border-gray-700/50 hover:bg-gray-700/50 hover:border-gray-600'
-        }
-      `}
-      onClick={onLoad}
+      className="group relative p-3 rounded-lg border transition-all bg-gray-800/50 border-gray-700/50"
     >
       <div className="flex gap-3">
         {/* Thumbnail */}
-        <div className="w-16 h-16 rounded-md bg-gray-700 overflow-hidden flex-shrink-0">
+        <div className="w-16 h-16 rounded-md bg-gray-700 overflow-hidden shrink-0">
           {entry.imageThumbnail ? (
             <img 
               src={entry.imageThumbnail} 
@@ -65,18 +53,13 @@ function HistoryCard({
             <span className="text-sm font-medium text-gray-200">
               {entry.objectCount} objects
             </span>
-            {isActive && (
-              <span className="px-1.5 py-0.5 text-xs rounded bg-emerald-500/30 text-emerald-400">
-                Current
-              </span>
-            )}
           </div>
           <p className="text-xs text-gray-500 mt-1">
             {formatTimeAgo(entry.timestamp)}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">
-              {entry.provider === 'google' ? '🔍 Vision' : entry.provider === 'openai' ? '🤖 GPT' : '✨ Auto'}
+              {entry.provider === 'google' ? '🌐 Vision' : entry.provider === 'openai' ? '🤖 GPT' : '✨ Auto'}
             </span>
           </div>
         </div>
@@ -101,23 +84,20 @@ function HistoryCard({
   );
 }
 
-export default function HistoryPanel({ onLoadHistory, currentImageHash, onClose }: HistoryPanelProps) {
+export default function HistoryPanel({ onLoadHistory, onClose }: HistoryPanelProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [cacheStats, setCacheStats] = useState({ entries: 0, sizeKB: 0 });
 
   useEffect(() => {
     setHistory(getHistory());
-    setCacheStats(getCacheStats());
   }, []);
 
   const handleDelete = (id: string) => {
     removeFromHistory(id);
     setHistory(getHistory());
-    setCacheStats(getCacheStats());
   };
 
   const handleClearAll = () => {
-    if (confirm('Clear all history? Cached results will be kept.')) {
+    if (confirm('Clear all history?')) {
       clearHistory();
       setHistory([]);
     }
@@ -145,11 +125,9 @@ export default function HistoryPanel({ onLoadHistory, currentImageHash, onClose 
           </button>
         </div>
         
-        {/* Cache stats */}
-        <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-          <span>💾 {cacheStats.entries} cached</span>
-          <span>📦 {cacheStats.sizeKB} KB</span>
-        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Past analyses (re-upload to analyze again)
+        </p>
       </div>
 
       {/* History List */}
@@ -168,8 +146,6 @@ export default function HistoryPanel({ onLoadHistory, currentImageHash, onClose 
             <HistoryCard
               key={entry.id}
               entry={entry}
-              isActive={entry.imageHash === currentImageHash}
-              onLoad={() => onLoadHistory(entry.imageHash)}
               onDelete={() => handleDelete(entry.id)}
             />
           ))

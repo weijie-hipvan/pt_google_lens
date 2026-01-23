@@ -11,7 +11,7 @@ import ActionBar, { AIProvider } from '@/components/ActionBar';
 import ExportModal from '@/components/ExportModal';
 import ProductLinksPanel from '@/components/ProductLinksPanel';
 import HistoryPanel from '@/components/HistoryPanel';
-import { generateImageHash, addToHistory, getCachedResult, clearCacheForImage } from '@/lib/cache';
+import { addToHistory } from '@/lib/cache';
 
 export default function Home() {
   const {
@@ -37,41 +37,22 @@ export default function Home() {
   const [searchingObjectId, setSearchingObjectId] = useState<string | undefined>();
   const [searchingObjectBoundingBox, setSearchingObjectBoundingBox] = useState<{ x: number; y: number; width: number; height: number } | undefined>();
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>('google');
-  const [cacheStatus, setCacheStatus] = useState<{ detection: boolean; search: boolean } | null>(null);
-  const [currentImageHash, setCurrentImageHash] = useState<string | undefined>();
 
   // Boost with AI - runs both detection and visual search in parallel
-  const handleBoost = async (provider: AIProvider, skipCache: boolean = false) => {
+  const handleBoost = async (provider: AIProvider) => {
     if (!imageBase64) {
       setError('No image loaded. Please upload an image first.');
       return;
     }
-
-    const imageHash = generateImageHash(imageBase64);
-    setCurrentImageHash(imageHash);
-    
-    // If skipCache is true, clear cache for this image first
-    if (skipCache) {
-      clearCacheForImage(imageHash);
-      console.log('[Boost] Cache cleared for image, fetching fresh results...');
-    }
     
     setLoading(true);
     setError(null);
-    setCacheStatus(null);
     
     // Open the product panel and set initial states
     setShowProductPanel(true);
     setIsSearching(true);
     setSearchingObjectLabel('Entire Image');
     setVisualSearchResult(null);
-
-    // Run detection and visual search separately to handle errors independently
-    let detectResult: Awaited<ReturnType<typeof detectObjects>> | null = null;
-    let searchResult: Awaited<ReturnType<typeof visualSearch>> | null = null;
-
-    // Use cache or not based on skipCache flag
-    const useCache = !skipCache;
 
     try {
       // Start both requests
@@ -86,19 +67,19 @@ export default function Home() {
           width: imageDimensions.naturalWidth,
           height: imageDimensions.naturalHeight,
         } : undefined,
-      }, useCache);
+      });
 
       const searchPromise = visualSearch({
         image: imageBase64,
         options: { max_results: 20 },
-      }, useCache);
+      });
 
       // Wait for both to complete (don't fail if one fails)
       const results = await Promise.allSettled([detectPromise, searchPromise]);
 
       // Handle detection result
       if (results[0].status === 'fulfilled') {
-        detectResult = results[0].value;
+        const detectResult = results[0].value;
         console.log('[Boost] Detection result:', detectResult.success, detectResult.objects?.length, 'objects');
         
         if (detectResult.success) {
@@ -107,7 +88,7 @@ export default function Home() {
           // Save to history
           addToHistory({
             timestamp: Date.now(),
-            imageHash,
+            imageHash: imageBase64.substring(0, 50),
             imageThumbnail: imageBase64.length < 50000 ? imageBase64 : undefined,
             objectCount: detectResult.objects.length,
             provider,
@@ -122,7 +103,7 @@ export default function Home() {
 
       // Handle visual search result
       if (results[1].status === 'fulfilled') {
-        searchResult = results[1].value;
+        const searchResult = results[1].value;
         console.log('[Boost] Search result:', searchResult.success, searchResult.product_matches?.length, 'products');
         setVisualSearchResult(searchResult);
       } else {
@@ -139,12 +120,6 @@ export default function Home() {
         });
       }
 
-      // Track cache status
-      setCacheStatus({
-        detection: detectResult?.fromCache || false,
-        search: searchResult?.fromCache || false,
-      });
-
     } catch (err) {
       console.error('[Boost] Unexpected error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -154,28 +129,11 @@ export default function Home() {
     }
   };
 
-  // Load from history
-  const handleLoadHistory = useCallback((imageHash: string) => {
-    // Try to load from cache
-    const cachedDetection = getCachedResult<{ objects: typeof objects }>('detection', imageHash);
-    const cachedSearch = getCachedResult<VisualSearchResult>('visualSearch', imageHash);
-    
-    if (cachedDetection) {
-      setObjects(cachedDetection.objects);
-      setCurrentImageHash(imageHash);
-      setCacheStatus({ detection: true, search: !!cachedSearch });
-      
-      if (cachedSearch) {
-        setVisualSearchResult(cachedSearch);
-        setShowProductPanel(true);
-        setSearchingObjectLabel('Entire Image (Cached)');
-      }
-    } else {
-      setError('Cached data not found. Please re-analyze the image.');
-    }
-    
+  // Load from history (history feature - just shows past analyses, not full restore)
+  const handleLoadHistory = useCallback(() => {
+    setError('History feature shows past analyses. Please re-upload the image to analyze again.');
     setShowHistoryPanel(false);
-  }, [setObjects, setError]);
+  }, [setError]);
 
   const handleExport = () => {
     setShowExportModal(true);
@@ -293,30 +251,11 @@ export default function Home() {
                 >
                   🔍 Visual Search
                 </button>
-                {/* Refresh button - force re-fetch without cache */}
-                {currentImageHash && (
-                  <button
-                    onClick={() => handleBoost(selectedProvider, true)}
-                    disabled={isSearching}
-                    title="Clear cache and re-analyze"
-                    className="px-3 py-2 rounded-lg text-sm font-medium text-cyan-400 
-                               hover:bg-cyan-500/20 transition-colors disabled:opacity-50
-                               flex items-center gap-1.5"
-                  >
-                    🔄 Refresh
-                  </button>
-                )}
                 <button
                   onClick={() => {
-                    // Clear cache for current image before clearing
-                    if (currentImageHash) {
-                      clearCacheForImage(currentImageHash);
-                    }
                     clearImage();
-                    setCurrentImageHash(undefined);
                     setShowProductPanel(false);
                     setVisualSearchResult(null);
-                    setCacheStatus(null);
                   }}
                   className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 
                              hover:text-white hover:bg-gray-800/50 transition-colors"
@@ -328,26 +267,6 @@ export default function Home() {
           </div>
         </div>
       </header>
-
-      {/* Cache Status Banner */}
-      {cacheStatus && (cacheStatus.detection || cacheStatus.search) && (
-        <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-2">
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center justify-between">
-            <span className="text-emerald-400 text-sm flex items-center gap-2">
-              <span className="text-base">⚡</span>
-              Results loaded from cache (instant!)
-              {cacheStatus.detection && cacheStatus.search && ' • Both detection & search cached'}
-              {cacheStatus.detection && !cacheStatus.search && ' • Detection cached'}
-              {!cacheStatus.detection && cacheStatus.search && ' • Search cached'}
-            </span>
-            <button onClick={() => setCacheStatus(null)} className="text-emerald-400 hover:text-emerald-300 p-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Error Banner */}
       {error && (
@@ -380,7 +299,6 @@ export default function Home() {
             <div className="w-80 rounded-xl border border-gray-700/30 overflow-hidden bg-gray-800/50 flex-shrink-0">
               <HistoryPanel
                 onLoadHistory={handleLoadHistory}
-                currentImageHash={currentImageHash}
                 onClose={() => setShowHistoryPanel(false)}
               />
             </div>
@@ -410,7 +328,7 @@ export default function Home() {
                 isLoading={isSearching}
                 objectLabel={searchingObjectLabel}
                 objectId={searchingObjectId}
-                originalImageUrl={imageUrl}
+                originalImageUrl={imageUrl || undefined}
                 objectBoundingBox={searchingObjectBoundingBox}
                 onClose={() => setShowProductPanel(false)}
                 onProductsFound={setObjectRelatedProducts}

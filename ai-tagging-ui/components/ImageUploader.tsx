@@ -9,9 +9,13 @@ const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export default function ImageUploader() {
   const { setImage, setError } = useTaggingStore();
   const [isDragging, setIsDragging] = useState(false);
-  const [activeTab, setActiveTab] = useState<'file' | 'url'>('file');
+  // Temporarily hide file upload - image search only works with public URLs
+  const [activeTab, setActiveTab] = useState<'file' | 'url'>('url');
   const [urlInput, setUrlInput] = useState('');
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+  
+  // TEMP: Hide file upload since Google Lens image search requires public URLs
+  const SHOW_FILE_UPLOAD = false;
 
   const processFile = useCallback(
     async (file: File) => {
@@ -167,40 +171,42 @@ export default function ImageUploader() {
 
   return (
     <div className="w-full h-full min-h-[400px] flex flex-col bg-gray-800/30 rounded-xl overflow-hidden">
-      {/* Tabs */}
-      <div className="flex border-b border-gray-700">
-        <button
-          onClick={() => setActiveTab('file')}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2
-            ${activeTab === 'file'
-              ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800/50'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
-            }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Upload File
-        </button>
-        <button
-          onClick={() => setActiveTab('url')}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2
-            ${activeTab === 'url'
-              ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800/50'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
-            }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-          </svg>
-          Paste URL
-        </button>
-      </div>
+      {/* Tabs - Only show if file upload is enabled */}
+      {SHOW_FILE_UPLOAD && (
+        <div className="flex border-b border-gray-700">
+          <button
+            onClick={() => setActiveTab('file')}
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2
+              ${activeTab === 'file'
+                ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800/50'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+              }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Upload File
+          </button>
+          <button
+            onClick={() => setActiveTab('url')}
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2
+              ${activeTab === 'url'
+                ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800/50'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+              }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            Paste URL
+          </button>
+        </div>
+      )}
 
-      {/* File Upload Tab */}
-      {activeTab === 'file' && (
+      {/* File Upload Tab - Only show if enabled */}
+      {SHOW_FILE_UPLOAD && activeTab === 'file' && (
         <div
           onClick={handleClick}
           onDrop={handleDrop}
@@ -239,8 +245,8 @@ export default function ImageUploader() {
         </div>
       )}
 
-      {/* URL Input Tab */}
-      {activeTab === 'url' && (
+      {/* URL Input Tab - Always show if file upload is hidden */}
+      {(!SHOW_FILE_UPLOAD || activeTab === 'url') && (
         <div className="flex-1 flex flex-col items-center justify-center p-6">
           <svg
             className="w-16 h-16 text-gray-400 mb-4"

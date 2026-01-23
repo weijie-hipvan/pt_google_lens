@@ -15,6 +15,103 @@ interface ProductLinksPanelProps {
   onProductsFound?: (objectId: string, products: RelatedProduct[]) => void; // Callback when products found
 }
 
+// Product card component for displaying individual products
+interface ProductCardProps {
+  product: {
+    title?: string;
+    url?: string;
+    price?: string;
+    extracted_price?: number;
+    image_url?: string;
+    merchant?: string;
+    rating?: number;
+    reviews_count?: number;
+    shipping?: string;
+    condition?: string;
+  };
+  accentColor: 'purple' | 'blue' | 'emerald';
+}
+
+function ProductCard({ product, accentColor }: ProductCardProps) {
+  const colors = {
+    purple: {
+      bg: 'bg-purple-500/5 hover:bg-purple-500/10',
+      border: 'border-purple-500/20 hover:border-purple-500/40',
+      text: 'group-hover:text-purple-300',
+      price: 'text-purple-400',
+    },
+    blue: {
+      bg: 'bg-blue-500/5 hover:bg-blue-500/10',
+      border: 'border-blue-500/20 hover:border-blue-500/40',
+      text: 'group-hover:text-blue-300',
+      price: 'text-blue-400',
+    },
+    emerald: {
+      bg: 'bg-emerald-500/5 hover:bg-emerald-500/10',
+      border: 'border-emerald-500/20 hover:border-emerald-500/40',
+      text: 'group-hover:text-emerald-300',
+      price: 'text-emerald-400',
+    },
+  };
+  const c = colors[accentColor];
+
+  return (
+    <div className={`group p-2.5 ${c.bg} rounded-lg border ${c.border} transition-all`}>
+      <div className="flex gap-2.5">
+        {product.image_url && (
+          <a href={product.url} target="_blank" rel="noopener noreferrer">
+            <img src={product.image_url} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 hover:ring-2 hover:ring-white/30 transition-all" />
+          </a>
+        )}
+        <div className="flex-1 min-w-0">
+          <a href={product.url} target="_blank" rel="noopener noreferrer" className="block">
+            <p className={`text-xs font-medium text-gray-200 line-clamp-2 leading-snug ${c.text} transition-colors`}>{product.title}</p>
+          </a>
+          <div className="flex items-center gap-2 mt-1">
+            {product.price && (
+              <span className={`text-sm font-bold ${c.price}`}>{product.price}</span>
+            )}
+            {product.merchant && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-gray-700 text-gray-400 rounded">{product.merchant}</span>
+            )}
+          </div>
+          {(product.rating || product.shipping) && (
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px]">
+              {product.rating && (
+                <span className="flex items-center gap-0.5 text-yellow-400">
+                  ⭐ {product.rating.toFixed(1)}
+                </span>
+              )}
+              {product.shipping && (
+                <span className="text-cyan-400">🚚 {product.shipping}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigator.clipboard.writeText(JSON.stringify({
+              title: product.title,
+              price: product.price,
+              merchant: product.merchant,
+              url: product.url,
+              image_url: product.image_url,
+            }, null, 2));
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-white transition-all self-start"
+          title="Copy product data"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ShoppingLinkCard({ link }: { link: ShoppingLink }) {
   return (
     <a
@@ -64,46 +161,113 @@ function SimilarImageGrid({ images }: { images: string[] }) {
 
 export default function ProductLinksPanel({ searchResult, isLoading, objectLabel, objectId, originalImageUrl, objectBoundingBox, onClose, onProductsFound }: ProductLinksPanelProps) {
   const [activeTab, setActiveTab] = useState<'products' | 'similar' | 'tags'>('products');
-  const [shoppingResult, setShoppingResult] = useState<ShoppingSearchResult | null>(null);
-  const [isLoadingShopping, setIsLoadingShopping] = useState(false);
+  
+  // Separate state for image search and keyword search results
+  const [imageSearchResult, setImageSearchResult] = useState<ShoppingSearchResult | null>(null);
+  const [keywordSearchResult, setKeywordSearchResult] = useState<ShoppingSearchResult | null>(null);
+  const [isLoadingImageSearch, setIsLoadingImageSearch] = useState(false);
+  const [isLoadingKeywordSearch, setIsLoadingKeywordSearch] = useState(false);
+  
   const [searchKeyword, setSearchKeyword] = useState(objectLabel || '');
   const [lastSearchedKeyword, setLastSearchedKeyword] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
 
-  // Update searchKeyword when objectLabel changes
+  // Reset state when switching to a different object
   useEffect(() => {
     if (objectLabel && objectLabel !== 'Entire Image') {
       setSearchKeyword(objectLabel);
     }
-  }, [objectLabel]);
+    // Reset all search results when objectId changes
+    setImageSearchResult(null);
+    setKeywordSearchResult(null);
+    setLastSearchedKeyword('');
+    setHasSearched(false);
+  }, [objectId, objectLabel]);
 
-  // Search for products - uses image search (thumbnail URL) with keyword fallback
-  const fetchShoppingLinks = useCallback(async (query: string, useImageSearch: boolean = true) => {
-    if (!query.trim()) return;
-    setLastSearchedKeyword(query);
-    setIsLoadingShopping(true);
+  // Image-based search using Google Lens (cropped object image)
+  // Note: Only works with PUBLIC URLs (imgix, etc). Blob URLs from file uploads won't work.
+  const fetchImageSearch = useCallback(async () => {
+    if (!originalImageUrl || !objectBoundingBox) {
+      console.log('[ProductLinksPanel] Skipping image search - no URL or bounding box');
+      return;
+    }
+    
+    // Skip if it's a blob URL (from file upload) - Google Lens can't access these
+    if (originalImageUrl.startsWith('blob:')) {
+      console.log('[ProductLinksPanel] Skipping image search - blob URL not accessible by Google Lens');
+      setImageSearchResult({
+        success: false,
+        products: [],
+        error: 'Image search requires a public URL. Enter an image URL (e.g., imgix) to enable image search.',
+        search_type: 'image',
+        request_id: '',
+        processing_time_ms: 0,
+        query: '',
+        source: 'skipped',
+      });
+      return;
+    }
+    
+    setIsLoadingImageSearch(true);
     try {
-      // Pass original image URL + bounding box for Google Lens search
-      // Backend will crop the image to the specific object before sending to Google Lens
-      const imageUrl = useImageSearch ? originalImageUrl : undefined;
-      
-      // Debug log
-      console.log('[ProductLinksPanel] fetchShoppingLinks called:');
-      console.log('  - query:', query);
-      console.log('  - useImageSearch:', useImageSearch);
-      console.log('  - originalImageUrl:', originalImageUrl ? originalImageUrl.slice(0, 80) + '...' : 'null');
+      console.log('[ProductLinksPanel] Starting IMAGE search...');
+      console.log('  - originalImageUrl:', originalImageUrl.slice(0, 80) + '...');
       console.log('  - objectBoundingBox:', objectBoundingBox);
       
-      const result = await shoppingSearch(query, { 
-        image_url: imageUrl,
-        bounding_box: useImageSearch ? objectBoundingBox : undefined,
+      const result = await shoppingSearch('', { 
+        image_url: originalImageUrl,
+        bounding_box: objectBoundingBox,
       });
-      setShoppingResult(result);
       
-      // Log search type for debugging
-      console.log(`[ProductLinksPanel] Search completed - type: ${result.search_type || 'keyword'}, source: ${result.source}`);
+      // Only set if it was actually an image search
+      if (result.search_type === 'image') {
+        setImageSearchResult(result);
+        console.log(`[ProductLinksPanel] Image search completed - ${result.products?.length || 0} products`);
+        
+        // Save products to object
+        if (result.success && result.products && result.products.length > 0 && objectId && onProductsFound) {
+          const relatedProducts: RelatedProduct[] = result.products.map(p => ({
+            title: p.title,
+            url: p.url,
+            price: p.price,
+            extracted_price: p.extracted_price,
+            image_url: p.image_url,
+            merchant: p.merchant,
+            rating: p.rating,
+            reviews_count: p.reviews_count,
+            shipping: p.shipping,
+          }));
+          onProductsFound(objectId, relatedProducts);
+        }
+      } else {
+        // Backend fell back to keyword search, store it there instead
+        console.log('[ProductLinksPanel] Backend fell back to keyword search');
+        setKeywordSearchResult(result);
+      }
+    } catch (error) {
+      console.error('Image search error:', error);
+    } finally {
+      setIsLoadingImageSearch(false);
+    }
+  }, [originalImageUrl, objectBoundingBox, objectId, onProductsFound]);
+
+  // Keyword-based search using Google Shopping
+  const fetchKeywordSearch = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    
+    setLastSearchedKeyword(query);
+    setIsLoadingKeywordSearch(true);
+    try {
+      console.log('[ProductLinksPanel] Starting KEYWORD search for:', query);
       
-      // Save products to object if callback provided and objectId exists
-      if (result.success && result.products && result.products.length > 0 && objectId && onProductsFound) {
+      // Force keyword search by not passing image_url
+      const result = await shoppingSearch(query, {});
+      setKeywordSearchResult(result);
+      
+      console.log(`[ProductLinksPanel] Keyword search completed - ${result.products?.length || 0} products`);
+      
+      // Save products to object if no image search results
+      if (!imageSearchResult?.products?.length && result.success && result.products && result.products.length > 0 && objectId && onProductsFound) {
         const relatedProducts: RelatedProduct[] = result.products.map(p => ({
           title: p.title,
           url: p.url,
@@ -118,23 +282,39 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
         onProductsFound(objectId, relatedProducts);
       }
     } catch (error) {
-      console.error('Shopping search error:', error);
+      console.error('Keyword search error:', error);
     } finally {
-      setIsLoadingShopping(false);
+      setIsLoadingKeywordSearch(false);
     }
-  }, [objectId, originalImageUrl, objectBoundingBox, onProductsFound]);
+  }, [objectId, onProductsFound, imageSearchResult]);
 
-  // Auto-trigger shopping search when objectLabel changes and we have searchResult
-  // Only auto-search if not already searched this session
+  // Run both searches - image search first, then keyword search
+  const runBothSearches = useCallback(async (keyword: string) => {
+    setHasSearched(true);
+    
+    // Run both searches in parallel
+    await Promise.all([
+      fetchImageSearch(),
+      fetchKeywordSearch(keyword),
+    ]);
+  }, [fetchImageSearch, fetchKeywordSearch]);
+
+  // Auto-trigger searches when objectLabel changes
   useEffect(() => {
-    if (objectLabel && objectLabel !== 'Entire Image' && searchResult?.success && !lastSearchedKeyword) {
-      fetchShoppingLinks(objectLabel);
+    if (objectLabel && objectLabel !== 'Entire Image' && searchResult?.success && !hasSearched) {
+      runBothSearches(objectLabel);
     }
-  }, [objectLabel, searchResult?.success, fetchShoppingLinks, lastSearchedKeyword]);
+  }, [objectLabel, searchResult?.success, runBothSearches, hasSearched]);
+
+  // Combined loading state
+  const isLoadingShopping = isLoadingImageSearch || isLoadingKeywordSearch;
+  
+  // Combined product count
+  const totalProducts = (imageSearchResult?.products?.length || 0) + (keywordSearchResult?.products?.length || 0);
 
   // Products tab now shows shopping results (with prices) - the most useful for tagging
   const tabs = [
-    { id: 'products', label: 'Products', count: shoppingResult?.products?.length || shoppingResult?.shopping_links?.length || 0, icon: '🛒', loading: isLoadingShopping },
+    { id: 'products', label: 'Products', count: totalProducts, icon: '🛒', loading: isLoadingShopping },
     { id: 'similar', label: 'Similar', count: searchResult?.visually_similar_images?.length || 0, icon: '🖼️' },
     { id: 'tags', label: 'Tags', count: searchResult?.web_entities?.length || 0, icon: '🏷️' },
   ];
@@ -179,27 +359,21 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
             </p>
           )}
           
-          {/* Search Type Indicator */}
-          {shoppingResult && shoppingResult.success && (
-            <div className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 ${
-              shoppingResult.search_type === 'image' 
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
-                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-            }`}>
-              {shoppingResult.search_type === 'image' ? (
-                <>
-                  <span>📷</span>
-                  <span>Image Search</span>
-                </>
-              ) : (
-                <>
-                  <span>🔤</span>
-                  <span>Keyword Search</span>
-                </>
-              )}
-              <span className="opacity-60">({shoppingResult.source?.replace('serpapi_', '').replace('_', ' ')})</span>
-            </div>
-          )}
+          {/* Search Status Indicators */}
+          <div className="flex flex-wrap gap-1">
+            {imageSearchResult?.success && imageSearchResult.products && imageSearchResult.products.length > 0 && (
+              <div className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span>📷</span>
+                <span>{imageSearchResult.products.length}</span>
+              </div>
+            )}
+            {keywordSearchResult?.success && keywordSearchResult.products && keywordSearchResult.products.length > 0 && (
+              <div className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span>🔤</span>
+                <span>{keywordSearchResult.products.length}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -252,56 +426,106 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
           <div className="flex-1 overflow-y-auto p-3">
             {/* Products Tab - Shows shopping results with prices */}
             {activeTab === 'products' && (
-              <div className="space-y-3">
-                {/* Search Input Section */}
+              <div className="space-y-4">
+                {/* IMAGE SEARCH RESULTS SECTION */}
                 <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-400 text-sm">📷</span>
+                    <span className="text-xs font-semibold text-purple-300 uppercase tracking-wider">Image Search</span>
+                    <span className="text-[10px] text-gray-500">(Google Lens)</span>
+                    {isLoadingImageSearch && (
+                      <span className="w-3 h-3 border border-purple-500/50 border-t-purple-400 rounded-full animate-spin"></span>
+                    )}
+                  </div>
+                  
+                  {isLoadingImageSearch ? (
+                    <div className="flex items-center justify-center py-4 bg-purple-500/5 rounded-lg border border-purple-500/20">
+                      <span className="text-xs text-gray-400">Searching by image...</span>
+                    </div>
+                  ) : imageSearchResult?.success && imageSearchResult.products && imageSearchResult.products.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-gray-500">{imageSearchResult.products.length} visually similar products</span>
+                        <button
+                          onClick={() => {
+                            const data = imageSearchResult.products?.map(p => ({ title: p.title, price: p.price, merchant: p.merchant, url: p.url }));
+                            navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                          }}
+                          className="text-[10px] px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30"
+                        >
+                          📋 Copy
+                        </button>
+                      </div>
+                      {imageSearchResult.products.slice(0, 6).map((product, idx) => (
+                        <ProductCard key={`img-${idx}`} product={product} accentColor="purple" />
+                      ))}
+                    </div>
+                  ) : !isLoadingImageSearch && hasSearched ? (
+                    <div className="py-3 px-4 bg-gray-800/30 rounded-lg border border-gray-700/30 text-center">
+                      <p className="text-xs text-gray-500">No image search results</p>
+                      <p className="text-[10px] text-gray-600 mt-1">Try entering an imgix URL for better results</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* KEYWORD SEARCH RESULTS SECTION */}
+                <div className="space-y-2 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-400 text-sm">🔤</span>
+                    <span className="text-xs font-semibold text-blue-300 uppercase tracking-wider">Keyword Search</span>
+                    <span className="text-[10px] text-gray-500">(Google Shopping)</span>
+                    {isLoadingKeywordSearch && (
+                      <span className="w-3 h-3 border border-blue-500/50 border-t-blue-400 rounded-full animate-spin"></span>
+                    )}
+                  </div>
+                  
+                  {/* Search Input */}
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={searchKeyword}
                       onChange={(e) => setSearchKeyword(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && fetchShoppingLinks(searchKeyword)}
-                      placeholder="Enter keyword to search..."
-                      className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-gray-200 
-                                placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                      onKeyDown={(e) => e.key === 'Enter' && fetchKeywordSearch(searchKeyword)}
+                      placeholder="Search by keyword..."
+                      className="flex-1 px-2.5 py-1.5 bg-gray-900 border border-gray-600 rounded-lg text-xs text-gray-200 
+                                placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                     <button
-                      onClick={() => fetchShoppingLinks(searchKeyword)}
-                      disabled={isLoadingShopping || !searchKeyword.trim()}
-                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-700 disabled:text-gray-500
-                                text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                      onClick={() => fetchKeywordSearch(searchKeyword)}
+                      disabled={isLoadingKeywordSearch || !searchKeyword.trim()}
+                      className="px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:text-gray-500
+                                text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
                     >
-                      {isLoadingShopping ? (
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      {isLoadingKeywordSearch ? (
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                       ) : (
-                        <span>🔍</span>
+                        <>🔍 Search</>
                       )}
-                      Search
                     </button>
                   </div>
                   
-                  {/* Suggested Keywords from Visual Search */}
+                  {/* Suggested Keywords */}
                   {(() => {
                     const bestGuess = (searchResult as unknown as { best_guess_labels?: string[] } | null)?.best_guess_labels || [];
                     const webEntities = searchResult?.web_entities?.slice(0, 5).map(e => e.description) || [];
-                    const suggestions = [...new Set([objectLabel, ...bestGuess, ...webEntities])].filter(Boolean).slice(0, 6);
+                    const suggestions = [...new Set([objectLabel, ...bestGuess, ...webEntities])].filter(Boolean).slice(0, 5);
                     
                     if (suggestions.length === 0) return null;
                     
                     return (
                       <div className="flex flex-wrap gap-1.5 items-center">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wider mr-1">Try:</span>
+                        <span className="text-[10px] text-gray-500">Try:</span>
                         {suggestions.map((keyword, idx) => (
                           <button
                             key={idx}
                             onClick={() => {
                               setSearchKeyword(keyword || '');
-                              fetchShoppingLinks(keyword || '');
+                              fetchKeywordSearch(keyword || '');
                             }}
-                            className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                            className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
                               keyword === lastSearchedKeyword 
-                                ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50' 
-                                : 'bg-gray-700/50 text-gray-400 hover:bg-emerald-500/20 hover:text-emerald-300 border border-transparent'
+                                ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50' 
+                                : 'bg-gray-700/50 text-gray-400 hover:bg-blue-500/20 hover:text-blue-300 border border-transparent'
                             }`}
                           >
                             {keyword}
@@ -313,150 +537,66 @@ export default function ProductLinksPanel({ searchResult, isLoading, objectLabel
                   
                   {lastSearchedKeyword && (
                     <p className="text-[10px] text-gray-500">
-                      Searched: &quot;<span className="text-emerald-400">{lastSearchedKeyword}</span>&quot;
+                      Searched: &quot;<span className="text-blue-400">{lastSearchedKeyword}</span>&quot;
                     </p>
                   )}
+                  
+                  {isLoadingKeywordSearch ? (
+                    <div className="flex items-center justify-center py-4 bg-blue-500/5 rounded-lg border border-blue-500/20">
+                      <span className="text-xs text-gray-400">Searching by keyword...</span>
+                    </div>
+                  ) : keywordSearchResult?.success && keywordSearchResult.products && keywordSearchResult.products.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-gray-500">{keywordSearchResult.products.length} products found</span>
+                        <button
+                          onClick={() => {
+                            const data = keywordSearchResult.products?.map(p => ({ title: p.title, price: p.price, merchant: p.merchant, url: p.url }));
+                            navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                          }}
+                          className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30"
+                        >
+                          📋 Copy
+                        </button>
+                      </div>
+                      {keywordSearchResult.products.slice(0, 8).map((product, idx) => (
+                        <ProductCard key={`kw-${idx}`} product={product} accentColor="blue" />
+                      ))}
+                    </div>
+                  ) : !isLoadingKeywordSearch && lastSearchedKeyword ? (
+                    <div className="py-3 px-4 bg-gray-800/30 rounded-lg border border-gray-700/30 text-center">
+                      <p className="text-xs text-gray-500">No keyword search results</p>
+                    </div>
+                  ) : null}
                 </div>
-                
-                {/* Loading State */}
-                {isLoadingShopping ? (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="w-6 h-6 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin"></div>
-                    <span className="ml-2 text-sm text-gray-400">Finding products...</span>
+
+                {/* Show quick search links if no products at all */}
+                {!isLoadingShopping && !imageSearchResult?.products?.length && !keywordSearchResult?.products?.length && 
+                 keywordSearchResult?.shopping_links && keywordSearchResult.shopping_links.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-gray-500 mb-2">No products found. Search on:</p>
+                    {keywordSearchResult.shopping_links.map((link, idx) => (
+                      <ShoppingLinkCard key={idx} link={link} />
+                    ))}
                   </div>
-                ) : shoppingResult?.success ? (
-                  <>
-                    {shoppingResult.products && shoppingResult.products.length > 0 && (
-                      <div className="space-y-3">
-                        {/* Summary header */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-400">{shoppingResult.products.length} products found</span>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              const data = shoppingResult.products?.map(p => ({
-                                title: p.title,
-                                price: p.price,
-                                merchant: p.merchant,
-                                url: p.url,
-                                rating: p.rating,
-                                reviews: p.reviews_count,
-                                shipping: p.shipping
-                              }));
-                              navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-                            }}
-                            className="text-[10px] px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
-                          >
-                            📋 Copy All
-                          </button>
-                        </div>
-                        {shoppingResult.products.slice(0, 12).map((product, idx) => (
-                          <div key={idx} className="group p-3 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all">
-                            <div className="flex gap-3">
-                              {product.image_url && (
-                                <a href={product.url} target="_blank" rel="noopener noreferrer">
-                                  <img src={product.image_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 hover:ring-2 hover:ring-emerald-500 transition-all" />
-                                </a>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <a href={product.url} target="_blank" rel="noopener noreferrer" className="block">
-                                  <p className="text-sm font-medium text-gray-200 line-clamp-2 leading-snug group-hover:text-emerald-300 transition-colors">{product.title}</p>
-                                </a>
-                                
-                                {/* Price & Merchant Row */}
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  {product.price && (
-                                    <span className="text-base font-bold text-emerald-400">{product.price}</span>
-                                  )}
-                                  {product.merchant && (
-                                    <span className="text-xs px-2 py-0.5 bg-gray-700 text-gray-300 rounded">{product.merchant}</span>
-                                  )}
-                                </div>
-                                
-                                {/* Rating & Reviews Row */}
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs">
-                                  {product.rating && (
-                                    <span className="flex items-center gap-1 text-yellow-400">
-                                      <span>⭐</span> 
-                                      <span className="font-medium">{product.rating.toFixed(1)}</span>
-                                    </span>
-                                  )}
-                                  {product.reviews_count && (
-                                    <span className="text-gray-500">({product.reviews_count.toLocaleString()} reviews)</span>
-                                  )}
-                                </div>
-                                
-                                {/* Shipping & Condition Row */}
-                                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
-                                  {product.shipping && (
-                                    <span className="text-cyan-400 flex items-center gap-1">
-                                      <span>🚚</span> {product.shipping}
-                                    </span>
-                                  )}
-                                  {product.condition && (
-                                    <span className="text-orange-400 flex items-center gap-1">
-                                      <span>📦</span> {product.condition}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Copy button */}
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const data = {
-                                    title: product.title,
-                                    price: product.price,
-                                    extracted_price: product.extracted_price,
-                                    merchant: product.merchant,
-                                    url: product.url,
-                                    image_url: product.image_url,
-                                    rating: product.rating,
-                                    reviews_count: product.reviews_count,
-                                    shipping: product.shipping,
-                                    condition: product.condition
-                                  };
-                                  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-white transition-all self-start"
-                                title="Copy product data"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Show quick search links if no products with prices */}
-                    {(!shoppingResult.products || shoppingResult.products.length === 0) && 
-                     shoppingResult.shopping_links && shoppingResult.shopping_links.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-xs text-gray-500 mb-2">No products with prices found. Search on:</p>
-                        {shoppingResult.shopping_links.map((link, idx) => (
-                          <ShoppingLinkCard key={idx} link={link} />
-                        ))}
-                      </div>
-                    )}
-                    {/* Show quick search links below products if both exist */}
-                    {shoppingResult.products && shoppingResult.products.length > 0 && 
-                     shoppingResult.shopping_links && shoppingResult.shopping_links.length > 0 && (
-                      <div className="space-y-1.5 mt-4 pt-3 border-t border-gray-700/50">
-                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Search More</h4>
-                        {shoppingResult.shopping_links.slice(0, 4).map((link, idx) => (
-                          <ShoppingLinkCard key={idx} link={link} />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
+                )}
+                
+                {/* Show quick search links below products if both exist */}
+                {(imageSearchResult?.products?.length || keywordSearchResult?.products?.length) && 
+                 keywordSearchResult?.shopping_links && keywordSearchResult.shopping_links.length > 0 && (
+                  <div className="space-y-1.5 mt-4 pt-3 border-t border-gray-700/50">
+                    <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Search More</h4>
+                    {keywordSearchResult.shopping_links.slice(0, 4).map((link, idx) => (
+                      <ShoppingLinkCard key={idx} link={link} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Empty state when no searches have been done */}
+                {!hasSearched && !isLoadingShopping && (
                   <div className="text-center py-4 text-gray-500">
-                    <p className="text-sm">Enter a keyword above to search for products</p>
-                    <p className="text-xs mt-1 text-gray-600">Or click on a suggested keyword</p>
+                    <p className="text-sm">Click search or select a keyword above</p>
+                    <p className="text-xs mt-1 text-gray-600">Image search runs automatically if URL is provided</p>
                   </div>
                 )}
               </div>
